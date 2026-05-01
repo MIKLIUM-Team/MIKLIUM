@@ -61,81 +61,89 @@ COMPILED = [(re.compile(p), name) for p, name in ALL_BLOCKED]
 TMP_FILE_RE = re.compile(r'File "/tmp/[^"]+", ')
 LINE_RE = re.compile(r'(?<=line )\d+')
 
-WRAPPER = '''import sys, builtins
+WRAPPER = '''import sys as _sys, builtins as _builtins
 
 try:
-    import resource
+    import resource as _resource
     _mem = {max_memory} * 1024 * 1024
     try:
-        resource.setrlimit(resource.RLIMIT_AS, (_mem, _mem))
+        _resource.setrlimit(_resource.RLIMIT_AS, (_mem, _mem))
     except Exception:
         pass
     try:
-        resource.setrlimit(resource.RLIMIT_FSIZE, (0, 0))
+        _resource.setrlimit(_resource.RLIMIT_FSIZE, (0, 0))
     except Exception:
         pass
     try:
-        resource.setrlimit(resource.RLIMIT_NPROC, (0, 0))
+        _resource.setrlimit(_resource.RLIMIT_NPROC, (0, 0))
     except Exception:
         pass
 except Exception:
     pass
 
+_sys.setrecursionlimit({max_recursion})
+
 _blocked = set({blocked_set})
 _blocked_sysmod_keys = {blocked_sysmodules}
 _blocked_attrs = frozenset({blocked_dunders})
 
-for _mk in list(sys.modules.keys()):
+for _mk in list(_sys.modules.keys()):
     if _mk in _blocked_sysmod_keys or _mk.split(".")[0] in _blocked:
-        del sys.modules[_mk]
+        del _sys.modules[_mk]
 
-_original_import = __import__
+_original_import = _builtins.__import__
 def _safe_import(name, *args, **kwargs):
     if name.split(".")[0] in _blocked or name in _blocked_sysmod_keys:
         raise ImportError(f"{{name!r}} is blocked")
     return _original_import(name, *args, **kwargs)
 
-_orig_getattr = getattr
+_orig_getattr = _builtins.getattr
 def _safe_getattr(obj, name, *args):
     if isinstance(name, str) and name in _blocked_attrs:
         raise AttributeError(f"Access to {{name!r}} is blocked")
     return _orig_getattr(obj, name, *args)
 
+_orig_setattr = _builtins.setattr
 def _safe_setattr(obj, name, value):
     if isinstance(name, str) and name in _blocked_attrs:
         raise AttributeError(f"Setting {{name!r}} is blocked")
-    object.__setattr__(obj, name, value)
+    return _orig_setattr(obj, name, value)
 
+_orig_delattr = _builtins.delattr
 def _safe_delattr(obj, name):
     if isinstance(name, str) and name in _blocked_attrs:
         raise AttributeError(f"Deleting {{name!r}} is blocked")
-    object.__delattr__(obj, name)
+    return _orig_delattr(obj, name)
 
-builtins.__import__ = _safe_import
-builtins.getattr = _safe_getattr
-builtins.setattr = _safe_setattr
-builtins.delattr = _safe_delattr
+_builtins.__import__ = _safe_import
+_builtins.getattr = _safe_getattr
+_builtins.setattr = _safe_setattr
+_builtins.delattr = _safe_delattr
 
 for _func in ("open", "exec", "eval", "compile", "breakpoint", "exit", "quit", "vars"):
-    builtins.__dict__[_func] = None
+    _builtins.__dict__[_func] = None
 
 try:
-    import io
-    io.open = None
+    import io as _io
+    _io.open = None
 except ImportError:
     pass
 
-user_code = {user_code!r}
-exec(user_code)
+def _cleanup():
+    for _k in list(globals().keys()):
+        if _k.startswith("_") and _k not in ("__name__", "__doc__", "__package__", "__loader__", "__spec__", "__builtins__", "__file__"):
+            del globals()[_k]
+_cleanup()
 '''
 
-WRAPPER_PREFIX_LINES = len(WRAPPER.split("{user_code!r}")[0].format(
+FORMATTED_WRAPPER = WRAPPER.format(
     blocked_set=repr(set(BLOCKED_MODULES)),
     blocked_sysmodules=repr(BLOCKED_SYSMODULES_KEYS),
     blocked_dunders=repr(set(BLOCKED_DUNDERS)),
     max_memory=MAX_MEMORY_MB,
     max_recursion=MAX_RECURSION,
-).split("\n")) - 1
+)
+WRAPPER_PREFIX_LINES = len(FORMATTED_WRAPPER.split("\n"))
 
 def strip_strings(code):
     r = re.sub(r'"""[\s\S]*?"""', '""', code)
@@ -150,12 +158,10 @@ def check(code):
 
 def clean_stderr(text):
     text = TMP_FILE_RE.sub("", text)
-
     def adjust_line(m):
         n = int(m.group(0))
         adjusted = n - WRAPPER_PREFIX_LINES
         return str(max(adjusted, 1))
-
     text = LINE_RE.sub(adjust_line, text)
     return text
 
@@ -209,15 +215,7 @@ class handler(BaseHTTPRequestHandler):
                 "error": f"Blocked: {names} — not allowed in sandbox",
             })
 
-        safe_code = code.replace("{", "{{").replace("}", "}}")
-        script = WRAPPER.format(
-            user_code=safe_code,
-            blocked_set=repr(set(BLOCKED_MODULES)),
-            blocked_sysmodules=repr(BLOCKED_SYSMODULES_KEYS),
-            blocked_dunders=repr(set(BLOCKED_DUNDERS)),
-            max_memory=MAX_MEMORY_MB,
-            max_recursion=MAX_RECURSION,
-        )
+        script = FORMATTED_WRAPPER + "\n" + code
         start = time.perf_counter()
 
         tmp = None
