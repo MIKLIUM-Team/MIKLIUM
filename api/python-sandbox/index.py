@@ -61,8 +61,7 @@ COMPILED = [(re.compile(p), name) for p, name in ALL_BLOCKED]
 TMP_FILE_RE = re.compile(r'File "/tmp/[^"]+", ')
 LINE_RE = re.compile(r'(?<=line )\d+')
 
-WRAPPER = r'''
-import sys, builtins
+WRAPPER = '''import sys, builtins
 
 try:
     import resource
@@ -210,8 +209,9 @@ class handler(BaseHTTPRequestHandler):
                 "error": f"Blocked: {names} — not allowed in sandbox",
             })
 
+        safe_code = code.replace("{", "{{").replace("}", "}}")
         script = WRAPPER.format(
-            user_code=code,
+            user_code=safe_code,
             blocked_set=repr(set(BLOCKED_MODULES)),
             blocked_sysmodules=repr(BLOCKED_SYSMODULES_KEYS),
             blocked_dunders=repr(set(BLOCKED_DUNDERS)),
