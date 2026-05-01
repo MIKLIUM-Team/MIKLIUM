@@ -24,14 +24,14 @@ BLOCKED_MODULES = [
     "pickle", "shelve", "marshal",
     "importlib", "code", "codeop",
     "webbrowser", "antigravity", "turtle",
-    "gc", "resource", "atexit", "io",
+    "gc", "resource", "atexit",
     "posix", "nt", "posixpath", "ntpath", "genericpath",
     "_io", "_posixsubprocess", "_signal",
     "pwd", "grp", "fcntl", "termios", "tty", "pty",
     "_frozen_importlib", "_frozen_importlib_external",
 ]
 
-BLOCKED_BUILTINS = [
+BLOCKED_BUILTINS_FOR_STATIC = [
     "open", "exec", "eval", "compile", "breakpoint",
     "__import__", "exit", "quit",
 ]
@@ -39,8 +39,8 @@ BLOCKED_BUILTINS = [
 BLOCKED_DUNDERS = [
     "__subclasses__", "__globals__", "__builtins__",
     "__code__", "__bases__", "__mro__",
-    "__dict__",
-    "__class__",
+    "__dict__", "__class__", "__base__",
+    "__getattribute__", "__setattr__", "__delattr__",
 ]
 
 BLOCKED_SYSMODULES_KEYS = {
@@ -52,7 +52,7 @@ BLOCKED_SYSMODULES_KEYS = {
 
 ALL_BLOCKED = (
     [(rf"\b{re.escape(m)}\b", m) for m in BLOCKED_MODULES]
-    + [(rf"\b{re.escape(b)}\s*\(", b) for b in BLOCKED_BUILTINS]
+    + [(rf"\b{re.escape(b)}\s*\(", b) for b in BLOCKED_BUILTINS_FOR_STATIC]
     + [(re.escape(d), d) for d in BLOCKED_DUNDERS]
 )
 
@@ -61,7 +61,7 @@ COMPILED = [(re.compile(p), name) for p, name in ALL_BLOCKED]
 TMP_FILE_RE = re.compile(r'File "/tmp/[^"]+", ')
 LINE_RE = re.compile(r'(?<=line )\d+')
 
-WRAPPER = '''
+WRAPPER = r'''
 import sys, builtins
 
 try:
@@ -80,92 +80,63 @@ try:
     except Exception:
         pass
 except Exception:
-        pass
+    pass
 
-_BLOCKED_SYS_MODULES = {blocked_sysmodules}
 _blocked = set({blocked_set})
+_blocked_sysmod_keys = {blocked_sysmodules}
 _blocked_attrs = frozenset({blocked_dunders})
 
 for _mk in list(sys.modules.keys()):
-    if _mk in _BLOCKED_SYS_MODULES or _mk.split(".")[0] in _blocked:
+    if _mk in _blocked_sysmod_keys or _mk.split(".")[0] in _blocked:
         del sys.modules[_mk]
 
-class _SafeModules(dict):
-    def _check(self, key):
-        if key in _BLOCKED_SYS_MODULES or key.split(".")[0] in _blocked:
-            raise KeyError(f"Access to '{{key}}' is blocked")
-
-    def __getitem__(self, key):
-        self._check(key)
-        return super().__getitem__(key)
-
-    def __setitem__(self, key, value):
-        self._check(key)
-        super().__setitem__(key, value)
-
-    def __contains__(self, key):
-        if key in _BLOCKED_SYS_MODULES or key.split(".")[0] in _blocked:
-            return False
-        return super().__contains__(key)
-
-    def get(self, key, default=None):
-        if key in _BLOCKED_SYS_MODULES or key.split(".")[0] in _blocked:
-            return default
-        return super().get(key, default)
-
-    def pop(self, key, *args):
-        self._check(key)
-        return super().pop(key, *args)
-
-sys.modules = _SafeModules(sys.modules)
-sys.setrecursionlimit({max_recursion})
-
-_orig = __import__
-def _si(n, *a, **k):
-    if n.split(".")[0] in _blocked or n in _BLOCKED_SYS_MODULES:
-        raise ImportError(f"'{{n}}' is blocked")
-    return _orig(n, *a, **k)
-builtins.__import__ = _si
-
-builtins.open = None
-builtins.exec = None
-builtins.eval = None
-builtins.compile = None
-builtins.breakpoint = None
+def _safe_import(name, *args, **kwargs):
+    if name.split(".")[0] in _blocked or name in _blocked_sysmod_keys:
+        raise ImportError(f"{{name!r}} is blocked")
+    return __import__(name, *args, **kwargs)
 
 _orig_getattr = getattr
-
 def _safe_getattr(obj, name, *args):
     if isinstance(name, str) and name in _blocked_attrs:
-        raise AttributeError(f"Access to '{{name}}' is blocked")
+        raise AttributeError(f"Access to {{name!r}} is blocked")
     return _orig_getattr(obj, name, *args)
 
 def _safe_setattr(obj, name, value):
     if isinstance(name, str) and name in _blocked_attrs:
-        raise AttributeError(f"Setting '{{name}}' is blocked")
+        raise AttributeError(f"Setting {{name!r}} is blocked")
     object.__setattr__(obj, name, value)
 
 def _safe_delattr(obj, name):
     if isinstance(name, str) and name in _blocked_attrs:
-        raise AttributeError(f"Deleting '{{name}}' is blocked")
+        raise AttributeError(f"Deleting {{name!r}} is blocked")
     object.__delattr__(obj, name)
 
+builtins.__import__ = _safe_import
 builtins.getattr = _safe_getattr
 builtins.setattr = _safe_setattr
 builtins.delattr = _safe_delattr
-builtins.vars = None
 
-{code}
+for _func in ("open", "exec", "eval", "compile", "breakpoint", "exit", "quit", "vars"):
+    setattr(builtins, _func, None)
+
+try:
+    import io
+    io.open = None
+    io.FileIO = None
+except ImportError:
+    pass
+
+user_code = {user_code!r}
+exec(user_code)
 '''
 
-WRAPPER_PREFIX_LINES = WRAPPER.split("{code}")[0].format(
+WRAPPER_PREFIX_LINES = len(WRAPPER.split("{user_code!r}")[0].format(
     blocked_set=repr(set(BLOCKED_MODULES)),
     blocked_sysmodules=repr(BLOCKED_SYSMODULES_KEYS),
     blocked_dunders=repr(set(BLOCKED_DUNDERS)),
     max_memory=MAX_MEMORY_MB,
     max_recursion=MAX_RECURSION,
-).count("\n")
-
+).split("\n")) - 1
 
 def strip_strings(code):
     r = re.sub(r'"""[\s\S]*?"""', '""', code)
@@ -175,10 +146,8 @@ def strip_strings(code):
     r = re.sub(r"#.*$", "", r, flags=re.MULTILINE)
     return r
 
-
 def check(code):
     return [name for pat, name in COMPILED if pat.search(strip_strings(code))]
-
 
 def clean_stderr(text):
     text = TMP_FILE_RE.sub("", text)
@@ -190,7 +159,6 @@ def clean_stderr(text):
 
     text = LINE_RE.sub(adjust_line, text)
     return text
-
 
 class handler(BaseHTTPRequestHandler):
 
@@ -243,7 +211,7 @@ class handler(BaseHTTPRequestHandler):
             })
 
         script = WRAPPER.format(
-            code=code,
+            user_code=code,
             blocked_set=repr(set(BLOCKED_MODULES)),
             blocked_sysmodules=repr(BLOCKED_SYSMODULES_KEYS),
             blocked_dunders=repr(set(BLOCKED_DUNDERS)),
