@@ -26,7 +26,7 @@ BLOCKED_MODULES = [
     "webbrowser", "antigravity", "turtle",
     "gc", "resource", "atexit",
     "posix", "nt", "posixpath", "ntpath", "genericpath",
-    "_io", "_posixsubprocess", "_signal",
+    "_posixsubprocess", "_signal",
     "pwd", "grp", "fcntl", "termios", "tty", "pty",
     "_frozen_importlib", "_frozen_importlib_external",
 ]
@@ -44,7 +44,7 @@ BLOCKED_DUNDERS = [
 ]
 
 BLOCKED_SYSMODULES_KEYS = {
-    "posix", "nt", "_io", "_posixsubprocess", "_signal",
+    "posix", "nt", "_posixsubprocess", "_signal",
     "pwd", "grp", "fcntl", "posixpath", "ntpath", "genericpath",
     "_frozen_importlib", "_frozen_importlib_external",
     "zipimport", "_imp",
@@ -124,6 +124,12 @@ try:
     import io
     io.open = None
     io.FileIO = None
+except ImportError:
+    pass
+
+try:
+    import _io
+    _io.FileIO = None
 except ImportError:
     pass
 
