@@ -118,18 +118,11 @@ builtins.setattr = _safe_setattr
 builtins.delattr = _safe_delattr
 
 for _func in ("open", "exec", "eval", "compile", "breakpoint", "exit", "quit", "vars"):
-    setattr(builtins, _func, None)
+    builtins.__dict__[_func] = None
 
 try:
     import io
     io.open = None
-    io.FileIO = None
-except ImportError:
-    pass
-
-try:
-    import _io
-    _io.FileIO = None
 except ImportError:
     pass
 
