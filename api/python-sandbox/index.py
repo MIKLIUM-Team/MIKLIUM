@@ -90,10 +90,11 @@ for _mk in list(sys.modules.keys()):
     if _mk in _blocked_sysmod_keys or _mk.split(".")[0] in _blocked:
         del sys.modules[_mk]
 
+_original_import = __import__
 def _safe_import(name, *args, **kwargs):
     if name.split(".")[0] in _blocked or name in _blocked_sysmod_keys:
         raise ImportError(f"{{name!r}} is blocked")
-    return __import__(name, *args, **kwargs)
+    return _original_import(name, *args, **kwargs)
 
 _orig_getattr = getattr
 def _safe_getattr(obj, name, *args):
