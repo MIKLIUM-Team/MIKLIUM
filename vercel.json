@@ -1,6 +1,13 @@
 {
   "routes": [
     {
+      "src": "^/(?!api(?:/|$))(.*)",
+      "status": 308,
+      "headers": {
+        "Location": "https://miklium-team.github.io/MIKLIUM/$1"
+      }
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/$1",
       "check": true
@@ -10,10 +17,6 @@
     },
     {
       "src": "/api/(.*)",
-      "dest": "/api/404.js"
-    },
-    {
-      "src": "/(.*)",
       "dest": "/api/404.js"
     }
   ],

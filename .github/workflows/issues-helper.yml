@@ -12,6 +12,9 @@ permissions:
 
 jobs:
   set-priority:
+    if: >
+      github.event.action == 'opened' ||
+      (github.event.action == 'labeled' && contains(fromJson('["asap", "bug", "help wanted", "enhancement", "project submission", "documentation"]'), github.event.label.name))
     runs-on: ubuntu-latest
     steps:
       - name: Add issue to project and set priority
@@ -47,19 +50,16 @@ jobs:
             }
 
             const projectQuery = await github.graphql(`
-              query($org: String!, $number: Int!) {
-                organization(login: $org) {
-                  projectV2(number: $number) {
+              query(org: String!, number: Int!) {
+                organization(login: org) {
+                  projectV2(number: number) {
                     id
                     fields(first: 20) {
                       nodes {
                         ... on ProjectV2SingleSelectField {
                           id
                           name
-                          options {
-                            id
-                            name
-                          }
+                          options { id name }
                         }
                       }
                     }
@@ -83,29 +83,62 @@ jobs:
               return;
             }
 
-            const addResult = await github.graphql(`
-              mutation($projectId: ID!, $contentId: ID!) {
-                addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
-                  item {
-                    id
+            const issueStatusQuery = await github.graphql(`
+              query($issueId: ID!) {
+                node(id: $issueId) {
+                  ... on Issue {
+                    projectItems(first: 10) {
+                      nodes {
+                        id
+                        project { id }
+                        fieldValues(first: 20) {
+                          nodes {
+                            ... on ProjectV2ItemFieldSingleSelectValue {
+                              name
+                              field {
+                                ... on ProjectV2SingleSelectField { name }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }
-            `, { projectId, contentId: issueNodeId });
+            `, { issueId: issueNodeId });
 
-            const itemId = addResult.addProjectV2ItemById.item.id;
+            const existingItems = issueStatusQuery.node.projectItems.nodes;
+            const existingItem = existingItems.find(item => item.project.id === projectId);
+            
+            let itemId;
+
+            if (existingItem) {
+              itemId = existingItem.id;
+              const existingPriority = existingItem.fieldValues.nodes.find(fv => fv.field && fv.field.name === 'Priority');
+              if (existingPriority && existingPriority.name) {
+                return;
+              }
+            } else {
+              const addResult = await github.graphql(`
+                mutation(projectId: ID!, contentId: ID!) {
+                  addProjectV2ItemById(input: {projectId: projectId, contentId: contentId}) {
+                    item { id }
+                  }
+                }
+              `, { projectId, contentId: issueNodeId });
+              itemId = addResult.addProjectV2ItemById.item.id;
+            }
 
             await github.graphql(`
-              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+              mutation(projectId: ID!, itemId: ID!, fieldId: ID!, optionId: String!) {
                 updateProjectV2ItemFieldValue(input: {
-                  projectId: $projectId
-                  itemId: $itemId
-                  fieldId: $fieldId
-                  value: { singleSelectOptionId: $optionId }
+                  projectId: projectId
+                  itemId: itemId
+                  fieldId: fieldId
+                  value: { singleSelectOptionId: optionId }
                 }) {
-                  projectV2Item {
-                    id
-                  }
+                  projectV2Item { id }
                 }
               }
             `, {
@@ -116,7 +149,9 @@ jobs:
             });
 
   process-submission:
-    if: contains(github.event.label.name, 'project submission')
+    if: >
+      (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'project submission')) ||
+      (github.event.action == 'labeled' && github.event.label.name == 'project submission')
     runs-on: ubuntu-latest
     concurrency:
       group: project-submission
@@ -288,7 +323,7 @@ jobs:
                 `| **URL** | ${projectUrl} |`,
                 `| **Creator** | @${creator} |`,
                 ``,
-                `Closes #${issueNumber}`,
+                `Closes #${issueNumber}`
               ].join('\n')
             });
 

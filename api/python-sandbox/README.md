@@ -182,10 +182,10 @@ Unfortunately, the Python Sandbox is not designed to run very complex or potenti
 
 ### Code Limitations:
 
-* Maximum number of lines of code:`15 000`
+* Maximum number of characters of code: `15000`
 * Blocked modules that cannot be imported:
   ```python
-  "os", "subprocess", "shutil", "pathlib", "glob", "tempfile" # File system
+  "os", "sys", "subprocess", "shutil", "pathlib", "glob", "tempfile" # File system
   "socket", "urllib", "requests", "httpx", "http", "aiohttp" # Network
   "ftplib", "smtplib", "imaplib", "poplib" # Mail protocols
   "multiprocessing", "threading", "signal", "asyncio" # Concurrency
@@ -193,23 +193,22 @@ Unfortunately, the Python Sandbox is not designed to run very complex or potenti
   "pickle", "shelve", "marshal" # Unsafe serialization
   "importlib", "code", "codeop" # Dynamic imports
   "webbrowser", "antigravity", "turtle" # GUI and browser
-  "gc", "resource", "atexit", "io" # System resources
+  "gc", "resource", "atexit" # System resources
   "posix", "nt", "posixpath", "ntpath", "genericpath", "pwd", "grp", "fcntl", "termios", "tty", "pty" # Low-level system
   "_posixsubprocess", "_signal" # Low-level process
-  "_io" # Low-level backend
   "_frozen_importlib", "_frozen_importlib_external", "zipimport", "_imp" # Import system internals
   ```
-* Third-party modules cannot be imported
+* Third-party modules cannot be imported (standard library modules work fine: e.g. `json`, `math`, `random`, `datetime`, `itertools`, `collections`, `re`, and others)
 * Blocked build-in functions:
   ```python
   open() # File read or write
   exec() # Execute arbitrary code
   eval() # Evaluate strings as code
-  compile() # Compile code
-  breakpoint() # Debugging
+  compile() # Compile code (set to None)
+  breakpoint() # Debugging (set to None)
   __import__() # Dynamic import (intercepted)
-  exit() # Exit program
-  quit() # Exit program
+  exit() # Exit program (set to None)
+  quit() # Exit program (set to None)
   ```
 * Blocked Dunder Attributes (sandbox escape prevention):
   ```python
@@ -221,6 +220,10 @@ Unfortunately, the Python Sandbox is not designed to run very complex or potenti
   __mro__ # Method Resolution Order
   __dict__ # Access object internals
   __class__ # Class manipulation
+  __base__ # Direct parent class
+  __getattribute__ # Attribute access override
+  __setattr__ # Attribute setting override
+  __delattr__ # Attribute deletion override
   ```
 
 ### Code Running and Output Limits:
