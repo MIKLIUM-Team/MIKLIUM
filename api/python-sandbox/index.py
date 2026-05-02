@@ -16,7 +16,7 @@ MAX_MEMORY_MB = 64
 MAX_RECURSION = 200
 
 BLOCKED_MODULES = [
-    "os", "subprocess", "shutil", "pathlib", "glob", "tempfile",
+    "os", "sys", "subprocess", "shutil", "pathlib", "glob", "tempfile",
     "socket", "urllib", "requests", "httpx", "http", "aiohttp",
     "ftplib", "smtplib", "imaplib", "poplib",
     "multiprocessing", "threading", "signal", "asyncio",
@@ -63,71 +63,100 @@ LINE_RE = re.compile(r'(?<=line )\d+')
 
 WRAPPER = '''import sys as _sys, builtins as _builtins
 
+_mem = {max_memory} * 1024 * 1024
 try:
     import resource as _resource
-    _mem = {max_memory} * 1024 * 1024
-    try:
-        _resource.setrlimit(_resource.RLIMIT_AS, (_mem, _mem))
-    except Exception:
-        pass
-    try:
-        _resource.setrlimit(_resource.RLIMIT_FSIZE, (0, 0))
-    except Exception:
-        pass
-    try:
-        _resource.setrlimit(_resource.RLIMIT_NPROC, (0, 0))
-    except Exception:
-        pass
+    _resource.setrlimit(_resource.RLIMIT_AS, (_mem, _mem))
+    _resource.setrlimit(_resource.RLIMIT_FSIZE, (0, 0))
+    _resource.setrlimit(_resource.RLIMIT_NPROC, (0, 0))
 except Exception:
     pass
 
 _sys.setrecursionlimit({max_recursion})
 
-_blocked = set({blocked_set})
-_blocked_sysmod_keys = {blocked_sysmodules}
-_blocked_attrs = frozenset({blocked_dunders})
+if hasattr(_sys, "addaudithook"):
+    def _audit_hook(event, args):
+        if event in ("os.system", "os.exec", "os.spawn", "os.posix_spawn", "subprocess.Popen"):
+            raise RuntimeError("Execution blocked")
+        if event in ("socket.socket", "socket.getaddrinfo"):
+            raise RuntimeError("Network blocked")
+    try:
+        _sys.addaudithook(_audit_hook)
+    except Exception:
+        pass
 
-for _mk in list(_sys.modules.keys()):
-    if _mk in _blocked_sysmod_keys or _mk.split(".")[0] in _blocked:
-        del _sys.modules[_mk]
+def _setup_sandbox():
+    import sys
+    import builtins
+    
+    _blocked = set({blocked_set})
+    _blocked_sysmod_keys = {blocked_sysmodules}
+    _blocked_attrs = frozenset({blocked_dunders})
 
-_original_import = _builtins.__import__
-def _safe_import(name, *args, **kwargs):
-    if name.split(".")[0] in _blocked or name in _blocked_sysmod_keys:
-        raise ImportError(f"{{name!r}} is blocked")
-    return _original_import(name, *args, **kwargs)
+    orig_import = builtins.__import__
+    orig_exec = builtins.exec
+    orig_eval = builtins.eval
+    orig_open = builtins.open
+    orig_getattr = builtins.getattr
+    orig_setattr = builtins.setattr
+    orig_delattr = builtins.delattr
 
-_orig_getattr = _builtins.getattr
-def _safe_getattr(obj, name, *args):
-    if isinstance(name, str) and name in _blocked_attrs:
-        raise AttributeError(f"Access to {{name!r}} is blocked")
-    return _orig_getattr(obj, name, *args)
+    def _is_user():
+        try:
+            return sys._getframe(2).f_globals.get("__name__") == "__main__"
+        except Exception:
+            return False
 
-_orig_setattr = _builtins.setattr
-def _safe_setattr(obj, name, value):
-    if isinstance(name, str) and name in _blocked_attrs:
-        raise AttributeError(f"Setting {{name!r}} is blocked")
-    return _orig_setattr(obj, name, value)
+    def _safe_import(name, *args, **kwargs):
+        if _is_user():
+            base = name.split(".")[0]
+            if base in _blocked or base in _blocked_sysmod_keys:
+                raise ImportError(f"Importing {{name!r}} is blocked")
+        return orig_import(name, *args, **kwargs)
 
-_orig_delattr = _builtins.delattr
-def _safe_delattr(obj, name):
-    if isinstance(name, str) and name in _blocked_attrs:
-        raise AttributeError(f"Deleting {{name!r}} is blocked")
-    return _orig_delattr(obj, name)
+    def _safe_exec(*args, **kwargs):
+        if _is_user():
+            raise RuntimeError("exec is blocked")
+        return orig_exec(*args, **kwargs)
 
-_builtins.__import__ = _safe_import
-_builtins.getattr = _safe_getattr
-_builtins.setattr = _safe_setattr
-_builtins.delattr = _safe_delattr
+    def _safe_eval(*args, **kwargs):
+        if _is_user():
+            raise RuntimeError("eval is blocked")
+        return orig_eval(*args, **kwargs)
 
-for _func in ("open", "exec", "eval", "compile", "breakpoint", "exit", "quit", "vars"):
-    _builtins.__dict__[_func] = None
+    def _safe_open(*args, **kwargs):
+        if _is_user():
+            raise RuntimeError("open is blocked")
+        return orig_open(*args, **kwargs)
 
-try:
-    import io as _io
-    _io.open = None
-except ImportError:
-    pass
+    def _safe_getattr(obj, name, *args):
+        if isinstance(name, str) and name in _blocked_attrs and _is_user():
+            raise AttributeError(f"Access to {{name!r}} is blocked")
+        return orig_getattr(obj, name, *args)
+
+    def _safe_setattr(obj, name, value):
+        if isinstance(name, str) and name in _blocked_attrs and _is_user():
+            raise AttributeError(f"Setting {{name!r}} is blocked")
+        return orig_setattr(obj, name, value)
+
+    def _safe_delattr(obj, name):
+        if isinstance(name, str) and name in _blocked_attrs and _is_user():
+            raise AttributeError(f"Deleting {{name!r}} is blocked")
+        return orig_delattr(obj, name)
+
+    builtins.__import__ = _safe_import
+    builtins.getattr = _safe_getattr
+    builtins.setattr = _safe_setattr
+    builtins.delattr = _safe_delattr
+    builtins.exec = _safe_exec
+    builtins.eval = _safe_eval
+    builtins.open = _safe_open
+    builtins.compile = None
+    builtins.breakpoint = None
+    builtins.exit = None
+    builtins.quit = None
+
+_setup_sandbox()
 
 def _cleanup():
     for _k in list(globals().keys()):
