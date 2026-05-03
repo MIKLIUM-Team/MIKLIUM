@@ -5,13 +5,12 @@
   
   <a href="https://github.com/MIKLIUM-Team/MIKLIUM/stargazers"><img alt="GitHub repository stars" src="https://img.shields.io/github/stars/MIKLIUM-Team/MIKLIUM?style=for-the-badge&color=FFD74D"></a> <a href="https://github.com/MIKLIUM-Team/MIKLIUM/blob/main/LICENSE.md"><img alt="GitHub License" src="https://img.shields.io/github/license/MIKLIUM-Team/MIKLIUM?style=for-the-badge"></a> <a href="https://discord.gg/6HUJTXh45t"><img alt="Our discord" src="https://img.shields.io/discord/1409942072127000701?style=for-the-badge&label=discord&color=586AEA"></a>
 
-[Website](https://miklium-team.github.io/MIKLIUM/) • [Docs](https://github.com/MIKLIUM-Team/MIKLIUM/blob/main/APIDOCS.md) • [Announcements](https://github.com/MIKLIUM-Team/MIKLIUM/discussions/categories/announcements) • [Discord](https://discord.gg/6HUJTXh45t)
+[Website](https://miklium-team.github.io/MIKLIUM/) • [Docs](APIDOCS.md) • [Announcements](https://github.com/MIKLIUM-Team/MIKLIUM/discussions/categories/announcements) • [Discord](https://discord.gg/6HUJTXh45t)
 </div>
 
 ---
 
 ## Free APIs & Software for Everyone
-
 At MIKLIUM, we empower developers and users with high-quality, free APIs and software tools to help you build, innovate, and explore without limits.
 
 * **[Our Website](https://miklium-team.github.io/MIKLIUM/)**
@@ -38,8 +37,8 @@ At MIKLIUM, we empower developers and users with high-quality, free APIs and sof
 | Name | Description | Creator |
 |------|-------------|---------|
 | [Vector AI Agent](https://routinehub.co/shortcut/24957/) | Do multiple actions on device and do everyday help. Powered by MIKLIUM for web search. | [@morriszdweck](https://github.com/morriszdweck) |
-| [Nuvole AI](https://routinehub.co/shortcut/18431/) | The most convenient and incredibly powerful AI shortcut without API keys or Apps, powered with MIKLIUM Search and YouTube Transcript. | [@mikl-shortcuts](https://github.com/mikl-shortcuts) |
-| [Nuvole AI Lite](https://routinehub.co/shortcut/18428/) | The most convenient AI Shortcut without API keys or Apps, powered with GPT-5.2 and MIKLIUM Internet Search API. | [@mikl-shortcuts](https://github.com/mikl-shortcuts) |
+| [Nuvole AI](https://routinehub.co/shortcut/18431/) | The most convenient and incredibly powerful AI shortcut without API keys or Apps, powered with multiple AI models and MIKLIUM Search, YouTube Transcript. | [@mikl-shortcuts](https://github.com/mikl-shortcuts) |
+| [Nuvole AI Lite](https://routinehub.co/shortcut/18428/) | The most convenient AI Shortcut without API keys or Apps, powered with ChatGPT and MIKLIUM Internet Search API. | [@mikl-shortcuts](https://github.com/mikl-shortcuts) |
 
 [See all projects →](FEATURED_PROJECTS.md)
 <!-- FEATURED_PROJECTS_END -->
@@ -50,9 +49,7 @@ At MIKLIUM, we empower developers and users with high-quality, free APIs and sof
 <a href="https://github.com/MIKLIUM-Team/MIKLIUM/actions/workflows/api-tests.yml?query=branch%3Amain"><img alt="API Tests status" src="https://img.shields.io/github/actions/workflow/status/MIKLIUM-Team/MIKLIUM/api-tests.yml?branch=main&style=for-the-badge&logo=github-actions&logoColor=white&label=API%20TESTS"></a>
 
 ## Contribute
+Information describing how to contribute can be found in the [`Contributing to MIKLIUM`](CONTRIBUTING.md).
 
-Information describing how to contribute can be found in the [`Contributing to MIKLIUM`](https://github.com/MIKLIUM-Team/MIKLIUM/blob/main/CONTRIBUTING.md).
-
-## Stats
-
-![](https://repobeats.axiom.co/api/embed/c42a15b5310e14cdf02106d3e2bea022b0c39cc3.svg)
+## License
+This project is licensed under under the [MIT License](LICENSE.md)

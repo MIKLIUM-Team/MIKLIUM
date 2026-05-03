@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: '0 6 */3 * *'
 
+permissions:
+  contents: read
+  deployments: read
+
 jobs:
   api-tests:
     name: API Tests
