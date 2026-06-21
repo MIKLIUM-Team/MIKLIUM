@@ -5,72 +5,113 @@
 - [Search API Documentation](#search-api-documentation)
     - [Navigation](#navigation)
     - [About MIKLIUM Search API](#about-miklium-search-api)
-    - [Request Body](#request-body)
+    - [Request Parameters](#request-parameters)
         - [GET Method](#get-method)
         - [POST Method](#post-method)
     - [Code Examples](#code-examples)
     - [API Responses](#api-responses)
-        - [Success](#success)
+        - [Success (Web Search)](#success-web-search)
+        - [Success (Image Search)](#success-image-search)
+        - [Success (Video Search)](#success-video-search)
         - [Error](#error)
     - [Additional Information](#additional-information)
-        - [Types of the Information](#types-of-the-information)
-        - [Choosing the Right Information Format](#choosing-the-right-information-format)
+        - [Filtering Media Results](#filtering-media-results)
+        - [Choosing the Right Web Format](#choosing-the-right-web-format)
     - [What Services Does This API Use?](#what-services-does-this-api-use)
 
 ## About MIKLIUM Search API
 
-**Get information from the Internet on your request in a convenient format.** You can also configure how much data you need to receive and in what format. Our API uses the Yahoo Search engine (with an automatic fallback to DuckDuckGo), a robust website scraping system, and complete multilingual Unicode support.
+**Get text, image, or video search results from the Internet on your request.** You can configure the type of search, filter results by size or duration, and specify how much data you want to retrieve. The API uses the Yahoo Search engine (utilizing a built-in session cookie and consent-bypass mechanism) and includes a robust scraping system to extract full page contents.
 
-## Request Body
+## Request Parameters
 
 Link: `https://miklium.vercel.app/api/search`
 
+### General Parameters
 | Parameter | Required | Type | Description |
 | :--- | :--- | :--- | :--- |
-| `search` | Yes | Array | Search queries (maximum 5) |
-| `maxSmallSnippets`| No | Number | The number of short information for each request (by default `5`) |
-| `maxLargeSnippets` | No | Number | The number of long information for each request (by default `2`) |
-| `maxLargeSnippetSymbols` | No | Number | Maximum number of characters for one long information (by default `4500`) |
+| `search` | Yes | Array / String | Search queries (maximum 5) |
+| `type` | No | String | Type of search: `'default'`, `'images'`, or `'videos'` (by default `'default'`) |
+
+### Web Search Parameters for `type: 'default'`
+| Parameter | Required | Type | Description |
+| :--- | :--- | :--- | :--- |
+| `maxSmallSnippets`| No | Number | The number of short text snippets for each query (by default `5`) |
+| `maxLargeSnippets` | No | Number | The number of long full-text scrapes for each query (by default `2`) |
+| `maxLargeSnippetSymbols` | No | Number | Maximum number of characters for one long scrape (by default `4500`) |
+
+### Image Search Parameters for `type: 'images'`
+| Parameter | Required | Type | Description |
+| :--- | :--- | :--- | :--- |
+| `maxResults` | No | Number | Maximum number of results to return (by default `10`) |
+| `minWidth` | No | Number | Minimum image width in pixels |
+| `maxWidth` | No | Number | Maximum image width in pixels |
+| `minHeight` | No | Number | Minimum image height in pixels |
+| `maxHeight` | No | Number | Maximum image height in pixels |
+
+### Video Search Parameters for `type: `'videos'`
+| Parameter | Required | Type | Description |
+| :--- | :--- | :--- | :--- |
+| `maxResults` | No | Number | Maximum number of results to return (by default `10`) |
+| `minDuration` | No | String / Number | Minimum video duration (e.g. `"1:30"`, `"01:00:00"` or number of seconds) |
+| `maxDuration` | No | String / Number | Maximum video duration (e.g. `"10:00"` or number of seconds) |
+| `site` | No | String | Filter videos by origin host domain (e.g. `"youtube.com"`) |
+
+---
 
 ### GET Method
 
 `https://miklium.vercel.app/api/search?search=Paste Your query(queries) here`
 
-If you want to write several requests at once (maximum 5), connect them with `~`. If you want to add additional parameters, write them through `&`.
+If you want to write several requests at once (maximum 5), connect them with `~`. If you want to add additional parameters or filters, write them through `&`.
 
 > [!IMPORTANT]
-> For GET Method the search requests should be URL-encoded!
+> For the GET Method, the search requests should be URL-encoded!
 
 **Request Link Examples:**
-* `https://miklium.vercel.app/api/search?search=iPhone%20Air`
-* `https://miklium.vercel.app/api/search?search=iPhone%20Air~iPhone%2017%20Pro&maxSmallSnippets=3&maxLargeSnippets=0`
+* Web search: `https://miklium.vercel.app/api/search?search=iPhone%20Air`
+* Image search (with 2 requests and filters): `https://miklium.vercel.app/api/search?search=Nature~Birds&type=images&minWidth=1920&minHeight=1080`
+* Video search (with filters): `https://miklium.vercel.app/api/search?search=Nodejs%20tutorial&type=videos&maxResults=5&minDuration=01:00:00&site=youtube`
+
+---
 
 ### POST Method
 
 `https://miklium.vercel.app/api/search`
 
-```javascript
-{
-  "search": ["Paste Your query here", "If You need more requests at a time, add new objects to the list (maximum 5)"],
-  "maxSmallSnippets": 0, // Number (Not necessarily)
-  "maxLargeSnippets": 0, // Number (Not necessarily)
-  "maxLargeSnippetSymbols": 0 // Number (Not necessarily)
-}
-```
-
 **Request Body Examples (JSON):**
-```javascript
-{
-  "search": ["iPhone Air"]
-}
-```
-```javascript
-{
-  "search": ["iPhone Air", "iPhone 17 Pro"],
-  "maxSmallSnippets": 3,
-  "maxLargeSnippets": 0
-}
-```
+
+*   **Web search (Default):**
+    ```json
+    {
+      "search": ["iPhone Air"]
+    }
+    ```
+
+*   **Image search (with 2 requests and filters):**
+    ```json
+    {
+      "search": ["Nature", "Birds"],
+      "type": "images"
+      "minSize": {
+        "width": 1920,
+        "height": 1080
+      }
+    }
+    ```
+
+*   **Video search (with filters):**
+    ```json
+    {
+      "search": ["Nodejs tutorial"],
+      "type": "videos",
+      "maxResults": 5,
+      "minDuration": "01:00:00",
+      "site": "youtube"
+    }
+    ```
+
+---
 
 ## Code Examples
 
@@ -78,9 +119,11 @@ If you want to write several requests at once (maximum 5), connect them with `~`
 ```javascript
 const url = 'https://miklium.vercel.app/api/search';
 const data = {
-  search: ["iPhone 17 Pro"],
-  maxSmallSnippets: 3,
-  maxLargeSnippets: 1
+  search: ["JavaScript tutorial"],
+  type: "videos",
+  maxResults: 3,
+  minDuration: "10:00",
+  site: "youtube"
 };
 
 fetch(url, {
@@ -101,9 +144,10 @@ import requests
 
 url = "https://miklium.vercel.app/api/search"
 data = {
-    "search": ["iPhone 17 Pro"],
-    "maxSmallSnippets": 3,
-    "maxLargeSnippets": 1
+    "search": ["Cyberpunk landscape"],
+    "type": "images",
+    "maxResults": 5,
+    "minWidth": 1280
 }
 
 try:
@@ -120,48 +164,104 @@ curl -X POST https://miklium.vercel.app/api/search \
      -H "Content-Type: application/json" \
      -d '{
            "search": ["iPhone 17 Pro"],
+           "type": "default",
            "maxSmallSnippets": 3,
            "maxLargeSnippets": 1
          }'
 ```
 
+---
+
 ## API Responses
 
-### Success
+### Success (Web Search)
 
-**General response:**
+**Components of `results` elements for `'default'` type:**
 | Parameter | Value |
 | :--- | :--- |
-| `success` | `true` |
-| `results` | `Array with Dictionaries`, Search results |
+| `query` | `String`, The query associated with this result |
+| `symbols` | `Number`, The number of characters in the snippet |
+| `url` | `String`, Link to the source webpage |
+| `type` | `String: short OR long`, The format of information (search engine description vs. full-text scrape) |
+| `snippet` | `String`, The text content itself |
 
-**Components of `results` elements:**
-| Parameter | Value |
-| :--- | :--- |
-| `query` | `String`, The request to which the information was found |
-| `symbols` | `Number`, The number of characters that this information contains |
-| `url` | `String`, Link to the source of the information |
-| `type` | `String: short OR long`, Type of the information |
-| `snippet` | `String`, The information itself |
-
-**Success response example:**
-```javascript
+**Response example:**
+```json
 {
   "success": true,
   "results": [
     {
       "symbols": 194,
-      "query": "iPhone Air ",
+      "query": "iPhone Air",
       "url": "https://en.wikipedia.org/wiki/Iphone_air",
       "type": "short",
-      "snippet": "iPhone Air is..."
+      "snippet": "iPhone Air is rumored to be..."
     },
     {
-      "symbols": 4500,
-      "query": "iPhone 17 Pro Max",
-      "url": "https://www.pcmag.com/reviews/apple-iphone-17-pro-max",
+      "symbols": 4350,
+      "query": "iPhone Air",
+      "url": "https://www.pcmag.com/reviews/apple-iphone-air",
       "type": "long",
-      "snippet": "iPhone 17 Pro is…"
+      "snippet": "Apple is reportedly developing a super-thin smartphone..."
+    }
+  ]
+}
+```
+
+### Success (Image Search)
+
+**Components of `results` elements for `'images'` type:**
+| Parameter | Value |
+| :--- | :--- |
+| `imageUrl` | `String`, Direct link to the image |
+| `title` | `String`, Image title or alt text |
+| `referenceUrl` | `String`, Page URL where the image is hosted |
+| `size` | `Object`, Contains `width` (Number or `null`) and `height` (Number or `null`) |
+| `query` | `String`, The search query associated with this result |
+
+**Response example:**
+```json
+{
+  "success": true,
+  "results": [
+    {
+      "imageUrl": "https://example.com/wp-content/uploads/neon_city.jpg",
+      "title": "Neon City Grid Wallpaper",
+      "referenceUrl": "https://example.com/neon-city-gallery",
+      "size": {
+        "width": 1920,
+        "height": 1080
+      },
+      "query": "Neon city wallpaper"
+    }
+  ]
+}
+```
+
+### Success (Video Search)
+
+**Components of `results` elements for `'videos'` type:**
+| Parameter | Value |
+| :--- | :--- |
+| `videoUrl` | `String`, Direct link to the video (or video page) |
+| `thumbUrl` | `String`, Link to the video thumbnail |
+| `title` | `String`, Title of the video |
+| `description` | `String`, Brief video description |
+| `duration` | `String`, Video length (e.g. `"10:15"`, `"1:30:00"`, or `null`) |
+| `query` | `String`, The search query associated with this result |
+
+**Response example:**
+```json
+{
+  "success": true,
+  "results": [
+    {
+      "videoUrl": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "thumbUrl": "https://tse2.mm.bing.net/th/id/OVP.Tr3QV0Ijo966Ruun8RTPXwHgFo?pid=Api&h=360&w=480&c=7&rs=1",
+      "title": "Rick Astley - Never Gonna Give You Up",
+      "description": "The official video for “Never Gonna Give You Up” by Rick Astley...",
+      "duration": "3:34",
+      "query": "Lofi music"
     }
   ]
 }
@@ -172,33 +272,38 @@ curl -X POST https://miklium.vercel.app/api/search \
 | Parameter | Value |
 | :--- | :--- |
 | `success` | `false` |
-| `error` | `String`, Error message |
+| `error` | `String`, Error message details |
 
 **Error response example:**
-```javascript
+```json
 {
   "success": false,
-  "error": "Invalid or missing 'search' parameter."
+  "error": "Invalid type parameter"
 }
 ```
 
+---
+
 ## Additional Information
 
-### Types of the Information
+### Filtering Media Results
 
-As you have already noticed, the API returns two types of information: `short` and `long`. How are they different? Information marked `short` is obtained from a brief description of the site from the search engine. And the `long` information is already the full text from the site.
+*   **Resolution Filters:** For images, setting parameters like `minWidth`, `maxWidth`, `minHeight`, and `maxHeight` strictly filters out items that do not meet the criteria. If Yahoo does not provide metadata size parameters, those items may also be excluded to ensure quality.
+*   **Duration Parsing:** Video durations are parsed dynamically. Filters accept duration strings formatted as `"MM:SS"` or `"HH:MM:SS"`, as well as raw numbers representing seconds. For example, setting `minDuration: "05:00"` or `minDuration: 300` will ensure only videos longer than 5 minutes are retrieved.
 
-### Choosing the Right Information Format
+### Choosing the Right Web Format
 
-* You can change the amount of information issued and its type using parameters maxSmallSnippets` (the number of short information for each request (by default 5), `maxLargeSnippets` (the number of long information for each request (by default 2) and `maxLargeSnippetSymbols` (maximum number of characters for one long information (by default 4500).
+> [!NOTE]
+> Applies only when `type` is set to `'default'`
 
-* By setting the parameter `maxSmallSnippets` to 0, you will receive only information with `long` type, full information from sites. And by setting `maxLargeSnippets` to 0, you will only receive information with `short` type, brief information.
+*   **Short vs. Long Snippets:** Information marked `short` is parsed directly from the search engine result page (SERP) snippet text. The `long` type represents full-text scrapes. 
+*   **Disabling Formats:**
+    *   Set `maxSmallSnippets: 0` to fetch only `long` articles (completely avoiding short snippets).
+    *   Set `maxLargeSnippets: 0` to fetch only `short` search engine summaries (disabling the scraping phase for faster response times).
+*   **Formatting Limits:** The parameter `maxLargeSnippetSymbols` defines the character cutoff limit for scraped web articles (defaults to `4500` characters) to prevent excessive payloads.
 
-* The number behind the parameters `maxSmallSnippets` and `maxLargeSnippets` is responsible for the amount of relevant information for each request. For example, if we have two quires  in `search`, we set `maxSmallSnippets` to 2, and `maxLargeSnippets` to 1. Thus, 4 short information and 2 long will be found: 2 short and 1 long for each request.
-
-* The parameter `maxLargeSnippetSymbols` is responsible for the maximum number of characters in long information (by default 4500). If the limit is increased, the long information will be cut off.
+---
 
 ## What Services Does This API Use?
 
-- [Yahoo Search](https://search.yahoo.com)
-- [DuckDuckGo](https://duckduckgo.com) (used as a reliable fallback search engine)
+- [Yahoo Search / Images / Video](https://search.yahoo.com)

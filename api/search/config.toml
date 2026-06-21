@@ -13,43 +13,132 @@ placeholder = "iPhone 17, Apple Vision"
 required = true
 
 [[playground.inputs]]
+id = "type"
+label = "Search Type"
+type = "select"
+options = ["default", "images", "videos"]
+default = "default"
+
+[[playground.inputs]]
 id = "maxSmallSnippets"
 label = "Max Small Snippets"
 type = "number"
 default = 5
+visible_if_id = "type"
+visible_if_value = "default"
 
 [[playground.inputs]]
 id = "maxLargeSnippets"
 label = "Max Large Snippets"
 type = "number"
 default = 2
+visible_if_id = "type"
+visible_if_value = "default"
 
 [[playground.inputs]]
 id = "maxLargeSnippetSymbols"
 label = "Max Characters per Snippet"
 type = "number"
 default = 4500
+visible_if_id = "type"
+visible_if_value = "default"
+
+[[playground.inputs]]
+id = "minWidth"
+label = "Minimum Width (px)"
+type = "number"
+default = 0
+visible_if_id = "type"
+visible_if_value = "images"
+
+[[playground.inputs]]
+id = "maxWidth"
+label = "Maximum Width (px)"
+type = "number"
+default = 0
+visible_if_id = "type"
+visible_if_value = "images"
+
+[[playground.inputs]]
+id = "minHeight"
+label = "Minimum Height (px)"
+type = "number"
+default = 0
+visible_if_id = "type"
+visible_if_value = "images"
+
+[[playground.inputs]]
+id = "maxHeight"
+label = "Maximum Height (px)"
+type = "number"
+default = 0
+visible_if_id = "type"
+visible_if_value = "images"
+
+[[playground.inputs]]
+id = "minDuration"
+label = "Minimum Duration (sec or MM:SS)"
+type = "text"
+placeholder = "e.g., 30 or 1:30"
+visible_if_id = "type"
+visible_if_value = "videos"
+
+[[playground.inputs]]
+id = "maxDuration"
+label = "Maximum Duration (sec or MM:SS)"
+type = "text"
+placeholder = "e.g., 300 or 5:00"
+visible_if_id = "type"
+visible_if_value = "videos"
+
+[[playground.inputs]]
+id = "site"
+label = "Filter by Site (e.g., youtube.com)"
+type = "text"
+placeholder = "youtube.com"
+visible_if_id = "type"
+visible_if_value = "videos"
+
 
 [test]
 endpoint = "/api/search"
 method = "POST"
 
 [[test.cases]]
-name = "Basic search"
+name = "Web search"
 expected_key = "success"
 expected_value = true
 
 [test.cases.payload]
 search = ["MIKLIUM"]
+type = "default"
 maxSmallSnippets = 2
 maxLargeSnippets = 1
 
 [[test.cases]]
-name = "Multiple terms"
+name = "Image search"
 expected_key = "success"
 expected_value = true
 
 [test.cases.payload]
-search = ["Apple", "Shortcuts"]
-maxSmallSnippets = 1
-maxLargeSnippets = 1
+search = ["Apple Logo"]
+type = "images"
+minWidth = 500
+
+[[test.cases]]
+name = "Video search"
+expected_key = "success"
+expected_value = true
+
+[test.cases.payload]
+search = ["Minecraft Speedrun"]
+type = "videos"
+minDuration = "12:00"
+
+[[test.cases]]
+name = "Invalid search payload (Error Case)"
+expected_key = "success"
+expected_value = false
+
+[test.cases.payload]
+search = []

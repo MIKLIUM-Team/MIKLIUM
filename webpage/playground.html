@@ -1027,6 +1027,8 @@
             if (inp['default'] !== undefined) field['default'] = inp['default'];
             if (inp.min !== undefined) field.min = inp.min;
             if (inp.max !== undefined) field.max = inp.max;
+            if (inp.visible_if_id !== undefined) field.visible_if_id = inp.visible_if_id;
+            if (inp.visible_if_value !== undefined) field.visible_if_value = inp.visible_if_value;
             return field;
           })
         };
@@ -1146,12 +1148,61 @@
       return false;
     }
 
+    function evaluateVisibility() {
+      var config = API_CONFIGS[currentApi];
+      if (!config) return;
+
+      var currentValues = {};
+      config.inputs.forEach(function(input) {
+        var el = document.getElementById(input.id);
+        if (!el) return;
+        if (input.type === 'checkbox') {
+          currentValues[input.id] = el.checked;
+        } else {
+          currentValues[input.id] = el.value;
+        }
+      });
+
+      config.inputs.forEach(function(input) {
+        var el = document.getElementById(input.id);
+        if (!el) return;
+        var wrapper = el.closest('.form-field');
+        if (!wrapper) return;
+
+        if (input.visible_if_id !== undefined) {
+          var targetVal = currentValues[input.visible_if_id];
+          var expectedVal = input.visible_if_value;
+
+          var isVisible = false;
+          if (Array.isArray(expectedVal)) {
+            isVisible = expectedVal.indexOf(targetVal) !== -1;
+          } else {
+            isVisible = String(targetVal) === String(expectedVal);
+          }
+
+          if (isVisible) {
+            wrapper.style.display = 'flex';
+          } else {
+            wrapper.style.display = 'none';
+          }
+        } else {
+          wrapper.style.display = 'flex';
+        }
+      });
+    }
+
     function buildRequestBody() {
       var config = API_CONFIGS[currentApi];
       var data = {};
       config.inputs.forEach(function(input) {
         var el = document.getElementById(input.id);
         if (!el) return;
+
+        var wrapper = el.closest('.form-field');
+        if (wrapper && wrapper.style.display === 'none') {
+          return;
+        }
+
         if (input.type === 'checkbox') {
           data[input.id] = el.checked;
         } else if (input.type === 'number') {
@@ -1204,6 +1255,7 @@
           trigger.textContent = optEl.textContent;
           hiddenInput.value = opt;
           wrapper.classList.remove('open');
+          evaluateVisibility();
         });
 
         dropdown.appendChild(optEl);
@@ -1249,6 +1301,7 @@
           el.type = 'checkbox';
           el.id = input.id;
           el.checked = input['default'] || false;
+          el.addEventListener('change', evaluateVisibility);
           var box = document.createElement('span');
           box.className = 'custom-checkbox';
           box.innerHTML = '<i class="fas fa-check"></i>';
@@ -1274,6 +1327,7 @@
             el.placeholder = input.placeholder || '';
             el.rows = 4;
             if (input.required) el.required = true;
+            el.addEventListener('input', evaluateVisibility);
             field.appendChild(el);
           } else {
             var el = document.createElement('input');
@@ -1284,12 +1338,15 @@
             if (input.max !== undefined) el.max = input.max;
             if (input['default'] !== undefined) el.value = input['default'];
             if (input.required) el.required = true;
+            el.addEventListener('input', evaluateVisibility);
             field.appendChild(el);
           }
         }
 
         dynamicInputs.appendChild(field);
       });
+
+      evaluateVisibility();
     }
 
     function setStatus(type, text) {
@@ -1316,11 +1373,16 @@
       config.inputs.forEach(function(input) {
         if (!input.required) return;
         var el = document.getElementById(input.id);
-        if (!el || !el.value) {
-          if (el) {
-            el.style.borderColor = '#ff453a';
-            el.style.boxShadow = '0 0 0 3px rgba(255, 69, 58, 0.12)';
-          }
+        if (!el) return;
+
+        var wrapper = el.closest('.form-field');
+        if (wrapper && wrapper.style.display === 'none') {
+          return;
+        }
+
+        if (!el.value) {
+          el.style.borderColor = '#ff453a';
+          el.style.boxShadow = '0 0 0 3px rgba(255, 69, 58, 0.12)';
           valid = false;
         } else {
           el.style.borderColor = '';
