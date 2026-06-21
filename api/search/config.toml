@@ -7,7 +7,7 @@ docs_anchor = "search-api-documentation"
 
 [[playground.inputs]]
 id = "search"
-label = "Queries (Comma separated, max 3)"
+label = "Queries (Comma separated, max 5)"
 type = "text"
 placeholder = "iPhone 17, Apple Vision"
 required = true
@@ -44,10 +44,18 @@ visible_if_id = "type"
 visible_if_value = "default"
 
 [[playground.inputs]]
+id = "maxResults"
+label = "Maximum number of results"
+type = "number"
+default = 10
+visible_if_id = "type"
+visible_if_value = ["images", "videos"]
+
+[[playground.inputs]]
 id = "minWidth"
 label = "Minimum Width (px)"
 type = "number"
-default = 0
+placeholder = 1920
 visible_if_id = "type"
 visible_if_value = "images"
 
@@ -55,7 +63,7 @@ visible_if_value = "images"
 id = "maxWidth"
 label = "Maximum Width (px)"
 type = "number"
-default = 0
+placeholder = 4096
 visible_if_id = "type"
 visible_if_value = "images"
 
@@ -63,7 +71,7 @@ visible_if_value = "images"
 id = "minHeight"
 label = "Minimum Height (px)"
 type = "number"
-default = 0
+placeholder = 1080
 visible_if_id = "type"
 visible_if_value = "images"
 
@@ -71,7 +79,7 @@ visible_if_value = "images"
 id = "maxHeight"
 label = "Maximum Height (px)"
 type = "number"
-default = 0
+placeholder = 2160
 visible_if_id = "type"
 visible_if_value = "images"
 
@@ -93,9 +101,9 @@ visible_if_value = "videos"
 
 [[playground.inputs]]
 id = "site"
-label = "Filter by Site (e.g., youtube.com)"
+label = "Filter by Site (e.g., youtube)"
 type = "text"
-placeholder = "youtube.com"
+placeholder = "youtube"
 visible_if_id = "type"
 visible_if_value = "videos"
 
