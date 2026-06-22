@@ -52,6 +52,12 @@ visible_if_id = "type"
 visible_if_value = ["images", "videos"]
 
 [[playground.inputs]]
+id = "site"
+label = "Filter by Site (e.g., github.com)"
+type = "text"
+placeholder = "github.com"
+
+[[playground.inputs]]
 id = "minWidth"
 label = "Minimum Width (px)"
 type = "number"
@@ -96,14 +102,6 @@ id = "maxDuration"
 label = "Maximum Duration (sec or MM:SS)"
 type = "text"
 placeholder = "e.g., 300 or 5:00"
-visible_if_id = "type"
-visible_if_value = "videos"
-
-[[playground.inputs]]
-id = "site"
-label = "Filter by Site (e.g., youtube)"
-type = "text"
-placeholder = "youtube"
 visible_if_id = "type"
 visible_if_value = "videos"
 
