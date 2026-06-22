@@ -27,11 +27,12 @@
 
 Link: `https://miklium.vercel.app/api/search`
 
-### General Parameters
+### General Parameters### General Parameters
 | Parameter | Required | Type | Description |
 | :--- | :--- | :--- | :--- |
 | `search` | Yes | Array / String | Search queries (maximum 5) |
 | `type` | No | String | Type of search: `'default'`, `'images'`, or `'videos'` (by default `'default'`) |
+| `site` | No | String | Filter results by origin host domain (e.g. `"wikipedia.org"`) |
 
 ### Web Search Parameters for `type: 'default'`
 | Parameter | Required | Type | Description |
@@ -55,7 +56,6 @@ Link: `https://miklium.vercel.app/api/search`
 | `maxResults` | No | Number | Maximum number of results to return (by default `10`) |
 | `minDuration` | No | String / Number | Minimum video duration (e.g. `"1:30"`, `"01:00:00"` or number of seconds) |
 | `maxDuration` | No | String / Number | Maximum video duration (e.g. `"10:00"` or number of seconds) |
-| `site` | No | String | Filter videos by origin host domain (e.g. `"youtube.com"`) |
 
 ---
 
@@ -71,7 +71,7 @@ If you want to write several requests at once (maximum 5), connect them with `~`
 **Request Link Examples:**
 * Web search: `https://miklium.vercel.app/api/search?search=iPhone%20Air`
 * Image search (with 2 requests and filters): `https://miklium.vercel.app/api/search?search=Nature~Birds&type=images&minWidth=1920&minHeight=1080`
-* Video search (with filters): `https://miklium.vercel.app/api/search?search=Nodejs%20tutorial&type=videos&maxResults=5&minDuration=01:00:00&site=youtube`
+* Video search (with filters): `https://miklium.vercel.app/api/search?search=Nodejs%20tutorial&type=videos&maxResults=5&minDuration=01:00:00&site=youtube.com`
 
 ---
 
@@ -107,7 +107,7 @@ If you want to write several requests at once (maximum 5), connect them with `~`
       "type": "videos",
       "maxResults": 5,
       "minDuration": "01:00:00",
-      "site": "youtube"
+      "site": "youtube.com"
     }
     ```
 
@@ -123,7 +123,7 @@ const data = {
   type: "videos",
   maxResults: 3,
   minDuration: "10:00",
-  site: "youtube"
+  site: "youtube.com"
 };
 
 fetch(url, {
@@ -166,7 +166,8 @@ curl -X POST https://miklium.vercel.app/api/search \
            "search": ["iPhone 17 Pro"],
            "type": "default",
            "maxSmallSnippets": 3,
-           "maxLargeSnippets": 1
+           "maxLargeSnippets": 1,
+           "site": "apple.com"
          }'
 ```
 
@@ -286,8 +287,9 @@ curl -X POST https://miklium.vercel.app/api/search \
 
 ## Additional Information
 
-### Filtering Media Results
+### Filtering Results
 
+*   **Universal Site Filter:** The `site` parameter can be used across all search types. When specified, results are limited to the selected source domain.
 *   **Resolution Filters:** For images, setting parameters like `minWidth`, `maxWidth`, `minHeight`, and `maxHeight` strictly filters out items that do not meet the criteria. If Yahoo does not provide metadata size parameters, those items may also be excluded to ensure quality.
 *   **Duration Parsing:** Video durations are parsed dynamically. Filters accept duration strings formatted as `"MM:SS"` or `"HH:MM:SS"`, as well as raw numbers representing seconds. For example, setting `minDuration: "05:00"` or `minDuration: 300` will ensure only videos longer than 5 minutes are retrieved.
 
