@@ -382,7 +382,7 @@ async function searchYahooVideos(query, maxResults, filters) {
     const description = anchor.find('.tile-description, .v-desc').text().trim() || '';
     const title = anchor.find('.tile-title, .v-title').text().trim() || img.attr('title') || img.attr('alt') || '';
 
-    if (videoUrl || thumbUrl) {
+    if (videoUrl) {
       results.push({ videoUrl, thumbUrl, title, description, duration, query });
     }
   });
@@ -480,13 +480,15 @@ async function handler(request, response) {
       let queryShortCount = 0;
       let queryLongCount = 0;
 
+      const searchQuery = filters.site ? `${query} site:${filters.site}` : query;
+
       try {
         if (type === 'images') {
-          results.push(...(await searchYahooImages(query, maxResults, filters)));
+          results.push(...(await searchYahooImages(searchQuery, maxResults, filters)));
         } else if (type === 'videos') {
-          results.push(...(await searchYahooVideos(query, maxResults, filters)));
+          results.push(...(await searchYahooVideos(searchQuery, maxResults, filters)));
         } else {
-          const queryResults = await searchYahooDefault(query);
+          const queryResults = await searchYahooDefault(searchQuery);
           for (const item of queryResults) {
             if (queryShortCount >= maxSmallSnippets && queryLongCount >= maxLargeSnippets) break;
             const { realUrl, snippet } = item;
