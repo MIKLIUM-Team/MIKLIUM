@@ -889,7 +889,7 @@ Unfortunately, the Python Sandbox is not designed to run very complex or potenti
 
 Link: `https://miklium.vercel.app/api/search`
 
-### General Parameters### General Parameters
+### General Parameters
 | Parameter | Required | Type | Description |
 | :--- | :--- | :--- | :--- |
 | `search` | Yes | Array / String | Search queries (maximum 5) |
@@ -899,25 +899,26 @@ Link: `https://miklium.vercel.app/api/search`
 ### Web Search Parameters for `type: 'default'`
 | Parameter | Required | Type | Description |
 | :--- | :--- | :--- | :--- |
-| `maxSmallSnippets`| No | Number | The number of short text snippets for each query (by default `5`) |
-| `maxLargeSnippets` | No | Number | The number of long full-text scrapes for each query (by default `2`) |
-| `maxLargeSnippetSymbols` | No | Number | Maximum number of characters for one long scrape (by default `4500`) |
+| `maxSmallSnippets`| No | Number | The number of short text snippets for each query (by default `5`, maximum small + large snippets `50`) |
+| `maxLargeSnippets` | No | Number | The number of long full-text scrapes for each query (by default `2`, maximum small + large snippets `50`) |
+| `maxLargeSnippetSymbols` | No | Number | Maximum number of characters for one long scrape (by default `4500`, maximum `12000`) |
 
 ### Image Search Parameters for `type: 'images'`
 | Parameter | Required | Type | Description |
 | :--- | :--- | :--- | :--- |
-| `maxResults` | No | Number | Maximum number of results to return (by default `10`) |
+| `maxResults` | No | Number | Maximum number of results to return (by default `10`, maximum `50`) |
 | `minWidth` | No | Number | Minimum image width in pixels |
 | `maxWidth` | No | Number | Maximum image width in pixels |
 | `minHeight` | No | Number | Minimum image height in pixels |
 | `maxHeight` | No | Number | Maximum image height in pixels |
 
-### Video Search Parameters for `type: `'videos'`
+### Video Search Parameters for `type: 'videos'`
 | Parameter | Required | Type | Description |
 | :--- | :--- | :--- | :--- |
-| `maxResults` | No | Number | Maximum number of results to return (by default `10`) |
+| `maxResults` | No | Number | Maximum number of results to return (by default `10`, maximum `50`) |
 | `minDuration` | No | String / Number | Minimum video duration (e.g. `"1:30"`, `"01:00:00"` or number of seconds) |
 | `maxDuration` | No | String / Number | Maximum video duration (e.g. `"10:00"` or number of seconds) |
+| `includeAdditionalData` | No | Boolean | If `true`, enriches video results with additional data (by default `false`, right now works only with YouTube videos) |
 
 ---
 
@@ -933,7 +934,7 @@ If you want to write several requests at once (maximum 5), connect them with `~`
 **Request Link Examples:**
 * Web search: `https://miklium.vercel.app/api/search?search=iPhone%20Air`
 * Image search (with 2 requests and filters): `https://miklium.vercel.app/api/search?search=Nature~Birds&type=images&minWidth=1920&minHeight=1080`
-* Video search (with filters): `https://miklium.vercel.app/api/search?search=Nodejs%20tutorial&type=videos&maxResults=5&minDuration=01:00:00&site=youtube.com`
+* Video search (with filters and additional data request): `https://miklium.vercel.app/api/search?search=Nodejs%20tutorial&type=videos&maxResults=5&minDuration=01:00:00&site=youtube.com&includeAdditionalData=true`
 
 ---
 
@@ -954,22 +955,21 @@ If you want to write several requests at once (maximum 5), connect them with `~`
     ```json
     {
       "search": ["Nature", "Birds"],
-      "type": "images"
-      "minSize": {
-        "width": 1920,
-        "height": 1080
-      }
+      "type": "images",
+      "minWidth": 1920,
+      "minHeight": 1080
     }
     ```
 
-*   **Video search (with filters):**
+*   **Video search (with filters and additional data request):**
     ```json
     {
       "search": ["Nodejs tutorial"],
       "type": "videos",
       "maxResults": 5,
       "minDuration": "01:00:00",
-      "site": "youtube.com"
+      "site": "youtube.com",
+      "includeAdditionalData": true
     }
     ```
 
@@ -985,7 +985,8 @@ const data = {
   type: "videos",
   maxResults: 3,
   minDuration: "10:00",
-  site: "youtube.com"
+  site: "youtube.com",
+  includeAdditionalData: true
 };
 
 fetch(url, {
@@ -997,7 +998,7 @@ fetch(url, {
 })
   .then(response => response.json())
   .then(data => console.log(data))
-  .catch(error => console.error('Error:', error));
+  .catch(error => console.error(error));
 ```
 
 ### Python (Requests)
@@ -1017,7 +1018,7 @@ try:
     response.raise_for_status()
     print(response.json())
 except requests.exceptions.RequestException as e:
-    print(f"Error: {e}")
+    print(e)
 ```
 
 ### cURL
@@ -1109,11 +1110,19 @@ curl -X POST https://miklium.vercel.app/api/search \
 | `videoUrl` | `String`, Direct link to the video (or video page) |
 | `thumbUrl` | `String`, Link to the video thumbnail |
 | `title` | `String`, Title of the video |
-| `description` | `String`, Brief video description |
+| `description` | `String`, Description of the video |
 | `duration` | `String`, Video length (e.g. `"10:15"`, `"1:30:00"`, or `null`) |
 | `query` | `String`, The search query associated with this result |
+| `additionalData` | `Object`, Present if `includeAdditionalData` is enabled |
 
-**Response example:**
+**Properties of `additionalData` object:**
+| Parameter | Value |
+| :--- | :--- |
+| `type` | `String` Service title (right now, always `"youtube"`) |
+| `channelTitle` | `String`, Channel title |
+| `statistics` | `Object`, Video stats, containing `viewCount`, `likeCount` and `commentCount` as strings |
+
+**Response example (with `includeAdditionalData: true`):**
 ```json
 {
   "success": true,
@@ -1124,7 +1133,16 @@ curl -X POST https://miklium.vercel.app/api/search \
       "title": "Rick Astley - Never Gonna Give You Up",
       "description": "The official video for “Never Gonna Give You Up” by Rick Astley...",
       "duration": "3:34",
-      "query": "Lofi music"
+      "query": "Lofi music",
+      "additionalData": {
+        "type": "youtube",
+        "channelTitle": "Rick Astley",
+        "statistics": {
+          "viewCount": "1450239102",
+          "likeCount": "17203912",
+          "commentCount": "3219412"
+        }
+      }
     }
   ]
 }
@@ -1164,13 +1182,14 @@ curl -X POST https://miklium.vercel.app/api/search \
 *   **Disabling Formats:**
     *   Set `maxSmallSnippets: 0` to fetch only `long` articles (completely avoiding short snippets).
     *   Set `maxLargeSnippets: 0` to fetch only `short` search engine summaries (disabling the scraping phase for faster response times).
-*   **Formatting Limits:** The parameter `maxLargeSnippetSymbols` defines the character cutoff limit for scraped web articles (defaults to `4500` characters) to prevent excessive payloads.
+*   **Formatting Limits:** The parameter `maxLargeSnippetSymbols` defines the character cutoff limit for scraped web articles (defaults to `4500` characters, cannot exceed `12000`) to prevent excessive payloads.
 
 ---
 
 ## What Services Does This API Use?
 
 - [Yahoo Search / Images / Video](https://search.yahoo.com)
+- [YouTube Data API v3](https://developers.google.com/youtube/v3)
 
 
 ---
