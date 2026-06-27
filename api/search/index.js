@@ -2,6 +2,15 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const https = require('https');
 
+const MAX_SEARCH_QUERIES_LIMIT = 5;
+const DEFAULT_MAX_RESULTS = 10;
+const MAX_RESULTS_LIMIT = 50;
+const MAX_SNIPPETS_SUM_LIMIT = 50;
+const DEFAULT_MAX_SMALL_SNIPPETS = 5;
+const DEFAULT_MAX_LARGE_SNIPPETS = 2;
+const DEFAULT_MAX_LARGE_SNIPPET_SYMBOLS = 4500;
+const MAX_LARGE_SNIPPET_SYMBOLS_LIMIT = 12000;
+
 const httpsAgent = new https.Agent({
   rejectUnauthorized: false,
   ciphers: 'TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:HIGH:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5',
@@ -91,10 +100,24 @@ function extractRealUrl(href) {
   if (match && match[1]) {
     try {
       const decoded = decodeURIComponent(match[1]);
-      return decoded.split('#')[0].split('?')[0];
+      return decoded.split('#')[0];
     } catch { return null; }
   }
   return null;
+}
+
+function extractVideoUrl(href) {
+  if (!href) return null;
+  try {
+    if (href.includes('r.search.yahoo.com')) {
+      const decoded = extractRealUrl(href);
+      if (decoded) return decoded;
+    }
+    const urlObj = new URL(href, 'https://video.search.yahoo.com');
+    const rUrl = urlObj.searchParams.get('rurl') || urlObj.searchParams.get('imgurl');
+    if (rUrl) return decodeURIComponent(rUrl);
+  } catch (e) {}
+  return href;
 }
 
 function parseDurationToSec(val) {
@@ -120,11 +143,65 @@ function parseNum(val) {
   return 0;
 }
 
+function extractYoutubeId(url) {
+  if (!url) return null;
+  try {
+    const urlObj = new URL(url);
+    if (urlObj.hostname.includes('youtube.com')) {
+      if (urlObj.pathname.startsWith('/embed/')) {
+        return urlObj.pathname.split('/')[2];
+      }
+      return urlObj.searchParams.get('v');
+    }
+    if (urlObj.hostname.includes('youtu.be')) {
+      return urlObj.pathname.substring(1);
+    }
+  } catch (e) {}
+  return null;
+}
+
+async function fetchYoutubeMetadata(videoIds) {
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) {
+    console.error('YOUTUBE_API_KEY is not defined in environment variables.');
+    return {};
+  }
+  if (videoIds.length === 0) {
+    return {};
+  }
+  try {
+    const response = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
+      params: {
+        part: 'snippet,statistics',
+        id: videoIds.join(','),
+        key: apiKey
+      }
+    });
+    const items = response.data?.items || [];
+    const dataMap = {};
+    for (const item of items) {
+      dataMap[item.id] = {
+        channelTitle: item.snippet?.channelTitle || '',
+        description: item.snippet?.description || '',
+        statistics: {
+          viewCount: item.statistics?.viewCount || '0',
+          likeCount: item.statistics?.likeCount || '0',
+          commentCount: item.statistics?.commentCount || '0'
+        }
+      };
+    }
+    return dataMap;
+  } catch (e) {
+    console.error('YouTube API Fetch error:', e.message, e.response?.data);
+    return {};
+  }
+}
+
 async function fetchWithFallback(url, maxSymbols = 5000, maxRetries = 2) {
   for (let i = 0; i < maxRetries; i++) {
     try {
       const response = await axios.get(url, {
-        timeout: 8000,
+        timeout: 9000,
         httpsAgent,
         headers: {
           'User-Agent': getRandomUserAgent(),
@@ -141,6 +218,58 @@ async function fetchWithFallback(url, maxSymbols = 5000, maxRetries = 2) {
   throw new Error('Content not qualified');
 }
 
+async function handleYahooConsent(consentUrl, baseHeaders) {
+  const currentHeaders = { ...baseHeaders };
+  currentHeaders['Cookie'] = getCookieString();
+  try {
+    const consentRes = await axios.get(consentUrl, {
+      headers: currentHeaders,
+      httpsAgent,
+      maxRedirects: 0,
+      validateStatus: () => true
+    });
+
+    if (consentRes.headers['set-cookie']) updateCookies(consentRes.headers['set-cookie']);
+    
+    const $ = cheerio.load(consentRes.data);
+    const formParams = new URLSearchParams();
+    let formFound = false;
+
+    $('form input[type="hidden"]').each((i, el) => {
+      formFound = true;
+      const name = $(el).attr('name');
+      const value = $(el).attr('value');
+      if (name && value) formParams.append(name, value);
+    });
+    
+    formParams.append('agree', 'agree');
+
+    if (formFound) {
+      const postRes = await axios.post(consentUrl, formParams.toString(), {
+        headers: {
+          ...currentHeaders,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Cookie': getCookieString(),
+          'Origin': 'https://consent.yahoo.com',
+          'Referer': consentUrl
+        },
+        httpsAgent,
+        maxRedirects: 0,
+        validateStatus: () => true
+      });
+
+      if (postRes.headers['set-cookie']) updateCookies(postRes.headers['set-cookie']);
+      
+      if (postRes.headers['location']) {
+        return new URL(postRes.headers['location'], consentUrl).toString();
+      }
+    }
+  } catch (e) {
+    console.error('Yahoo Consent flow failed:', e.message);
+  }
+  return null;
+}
+
 async function fetchYahooHtml(url, baseHeaders, maxRedirects = 4) {
   let currentUrl = url;
   let currentHeaders = { ...baseHeaders };
@@ -149,7 +278,7 @@ async function fetchYahooHtml(url, baseHeaders, maxRedirects = 4) {
     currentHeaders['Cookie'] = getCookieString();
     
     const response = await axios.get(currentUrl, {
-      timeout: 15000,
+      timeout: 18000,
       headers: currentHeaders,
       httpsAgent,
       maxRedirects: 0,
@@ -163,64 +292,37 @@ async function fetchYahooHtml(url, baseHeaders, maxRedirects = 4) {
       updateCookies(response.headers['set-cookie']);
     }
 
-    if (response.status === 500) {
-      if (contentLength === 0) {
-        continue;
-      } else {
-        throw new Error(`Yahoo returned 500 (Body: ${contentLength} bytes)`);
-      }
-    }
-
     if (response.status >= 300 && response.status < 400 && response.headers['location']) {
       const redirectUrl = new URL(response.headers['location'], currentUrl).toString();
 
       if (redirectUrl.includes('consent.yahoo.com') || redirectUrl.includes('guce.yahoo.com')) {
-        const consentRes = await axios.get(redirectUrl, {
-          headers: { ...currentHeaders, 'Cookie': getCookieString() },
-          httpsAgent,
-          maxRedirects: 0,
-          validateStatus: () => true
-        });
-
-        if (consentRes.headers['set-cookie']) updateCookies(consentRes.headers['set-cookie']);
-        
-        const $ = cheerio.load(consentRes.data);
-        const formParams = new URLSearchParams();
-        let formFound = false;
-
-        $('form input[type="hidden"]').each((i, el) => {
-          formFound = true;
-          const name = $(el).attr('name');
-          const value = $(el).attr('value');
-          if (name && value) formParams.append(name, value);
-        });
-        
-        formParams.append('agree', 'agree');
-
-        if (formFound) {
-          const postRes = await axios.post(redirectUrl, formParams.toString(), {
-            headers: {
-              ...currentHeaders,
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'Cookie': getCookieString(),
-              'Origin': 'https://consent.yahoo.com',
-              'Referer': redirectUrl
-            },
-            httpsAgent,
-            maxRedirects: 0,
-            validateStatus: () => true
-          });
-
-          if (postRes.headers['set-cookie']) updateCookies(postRes.headers['set-cookie']);
-          
-          if (postRes.headers['location']) {
-            currentUrl = new URL(postRes.headers['location'], redirectUrl).toString();
-            continue;
-          }
+        const nextUrl = await handleYahooConsent(redirectUrl, baseHeaders);
+        if (nextUrl) {
+          currentUrl = nextUrl;
+          continue;
         }
       }
       currentUrl = redirectUrl;
       continue;
+    }
+
+    if (response.status >= 400 || response.status === 999) {
+      throw new Error(`Yahoo returned status ${response.status} (Body size: ${contentLength} bytes)`);
+    }
+
+    if (bodyStr.includes('Unable to process request') || bodyStr.includes('999 Unable to process') || bodyStr.includes('unusual traffic') || bodyStr.includes('unusual activity')) {
+      throw new Error(`Yahoo blocked the request or detected unusual traffic (Status: ${response.status})`);
+    }
+
+    if (bodyStr.includes('consent.yahoo.com') || bodyStr.includes('guce.yahoo.com')) {
+      const match = bodyStr.match(/https?:\/\/(?:consent|guce)\.yahoo\.com[^\s'"]*/);
+      if (match) {
+        const nextUrl = await handleYahooConsent(match[0], baseHeaders);
+        if (nextUrl) {
+          currentUrl = nextUrl;
+          continue;
+        }
+      }
     }
     
     return bodyStr;
@@ -246,6 +348,7 @@ async function yahooFetchWithRetry(url, maxRetries = 3) {
       if (html && html.length > 500) return html;
       throw new Error(`Invalid response body`);
     } catch (error) {
+      console.error(`Attempt ${attempt} to fetch URL failed:`, error.message);
       if (attempt === maxRetries) throw error;
       await delay(1500);
     }
@@ -335,6 +438,32 @@ async function searchYahooImages(query, maxResults, filters) {
     });
   });
 
+  if (results.length === 0) {
+    $('a').each((i, elem) => {
+      if (results.length >= maxResults) return false;
+      const href = $(elem).attr('href');
+      if (!href) return;
+      try {
+        const urlObj = new URL(href, 'https://images.search.yahoo.com');
+        const imgUrlParam = urlObj.searchParams.get('imgurl');
+        if (imgUrlParam) {
+          const imageUrl = decodeURIComponent(imgUrlParam);
+          const rUrlParam = urlObj.searchParams.get('rurl');
+          const referenceUrl = rUrlParam ? decodeURIComponent(rUrlParam) : null;
+          const img = $(elem).find('img').first();
+          const title = $(elem).text().trim() || img.attr('title') || img.attr('alt') || '';
+          results.push({
+            imageUrl,
+            title,
+            referenceUrl,
+            size: { width: null, height: null },
+            query
+          });
+        }
+      } catch (e) {}
+    });
+  }
+
   return results;
 }
 
@@ -351,17 +480,12 @@ async function searchYahooVideos(query, maxResults, filters) {
     if (!anchor.length) return;
 
     const href = anchor.attr('href');
-    let videoUrl = null;
+    let videoUrl = extractVideoUrl(href);
     let site = '';
     
-    if (href) {
+    if (videoUrl) {
       try {
-        const urlObj = new URL(href, 'https://video.search.yahoo.com');
-        const rUrlParam = urlObj.searchParams.get('rurl') || urlObj.searchParams.get('imgurl');
-        if (rUrlParam) {
-          videoUrl = decodeURIComponent(rUrlParam);
-          site = new URL(videoUrl).hostname.toLowerCase();
-        }
+        site = new URL(videoUrl).hostname.toLowerCase();
       } catch (e) {}
     }
 
@@ -387,6 +511,34 @@ async function searchYahooVideos(query, maxResults, filters) {
     }
   });
 
+  if (results.length === 0) {
+    $('a').each((i, elem) => {
+      if (results.length >= maxResults) return false;
+      const href = $(elem).attr('href');
+      if (!href) return;
+      try {
+        const videoUrl = extractVideoUrl(href);
+        if (videoUrl) {
+          const site = new URL(videoUrl).hostname.toLowerCase();
+          if (filters.site && !site.includes(filters.site.toLowerCase())) return;
+
+          const img = $(elem).find('img').first();
+          const thumbUrl = img.attr('src') || img.attr('data-src') || null;
+          const title = $(elem).text().trim() || img.attr('title') || img.attr('alt') || '';
+          
+          results.push({
+            videoUrl,
+            thumbUrl,
+            title,
+            description: '',
+            duration: null,
+            query
+          });
+        }
+      } catch (e) {}
+    });
+  }
+
   return results;
 }
 
@@ -399,10 +551,11 @@ async function handler(request, response) {
 
   let search = [];
   let type = 'default';
-  let maxResults = 10;
-  let maxSmallSnippets = 5;
-  let maxLargeSnippets = 2;
-  let maxLargeSnippetSymbols = 4500;
+  let maxResults = DEFAULT_MAX_RESULTS;
+  let maxSmallSnippets = DEFAULT_MAX_SMALL_SNIPPETS;
+  let maxLargeSnippets = DEFAULT_MAX_LARGE_SNIPPETS;
+  let maxLargeSnippetSymbols = DEFAULT_MAX_LARGE_SNIPPET_SYMBOLS;
+  let includeAdditionalData = false;
   
   let filters = {
     minWidth: 0,
@@ -423,16 +576,20 @@ async function handler(request, response) {
         const searchParam = params.get('search');
         search = searchParam ? searchParam.split('~').map(s => s.trim()).filter(Boolean) : [];
         if (params.get('type')) type = params.get('type');
+        if (params.get('includeAdditionalData') === 'true') includeAdditionalData = true;
         
-        const maxRes = parseNum(params.get('maxResults'));
-        if (maxRes > 0) maxResults = maxRes;
-        
-        const maxSmall = parseNum(params.get('maxSmallSnippets'));
-        const maxLarge = parseNum(params.get('maxLargeSnippets'));
-        const maxSymbols = parseNum(params.get('maxLargeSnippetSymbols'));
-        if (maxSmall >= 0) maxSmallSnippets = maxSmall;
-        if (maxLarge >= 0) maxLargeSnippets = maxLarge;
-        if (maxSymbols > 0) maxLargeSnippetSymbols = maxSymbols;
+        if (params.get('maxResults') !== null) {
+          maxResults = parseNum(params.get('maxResults'));
+        }
+        if (params.get('maxSmallSnippets') !== null) {
+          maxSmallSnippets = parseNum(params.get('maxSmallSnippets'));
+        }
+        if (params.get('maxLargeSnippets') !== null) {
+          maxLargeSnippets = parseNum(params.get('maxLargeSnippets'));
+        }
+        if (params.get('maxLargeSnippetSymbols') !== null) {
+          maxLargeSnippetSymbols = parseNum(params.get('maxLargeSnippetSymbols'));
+        }
 
         filters.minWidth = parseNum(params.get('minWidth'));
         filters.maxWidth = parseNum(params.get('maxWidth'));
@@ -450,10 +607,13 @@ async function handler(request, response) {
       
       search = Array.isArray(parsed.search) ? parsed.search : [];
       if (parsed.type) type = parsed.type;
-      if (typeof parsed.maxResults === 'number' && parsed.maxResults > 0) maxResults = parsed.maxResults;
-      if (typeof parsed.maxSmallSnippets === 'number' && parsed.maxSmallSnippets >= 0) maxSmallSnippets = parsed.maxSmallSnippets;
-      if (typeof parsed.maxLargeSnippets === 'number' && parsed.maxLargeSnippets >= 0) maxLargeSnippets = parsed.maxLargeSnippets;
-      if (typeof parsed.maxLargeSnippetSymbols === 'number' && parsed.maxLargeSnippetSymbols > 0) maxLargeSnippetSymbols = parsed.maxLargeSnippetSymbols;
+      if (parsed.includeAdditionalData !== undefined) {
+        includeAdditionalData = parsed.includeAdditionalData === true || parsed.includeAdditionalData === 'true';
+      }
+      if (parsed.maxResults !== undefined) maxResults = parseNum(parsed.maxResults);
+      if (parsed.maxSmallSnippets !== undefined) maxSmallSnippets = parseNum(parsed.maxSmallSnippets);
+      if (parsed.maxLargeSnippets !== undefined) maxLargeSnippets = parseNum(parsed.maxLargeSnippets);
+      if (parsed.maxLargeSnippetSymbols !== undefined) maxLargeSnippetSymbols = parseNum(parsed.maxLargeSnippetSymbols);
       if (parsed.minWidth !== undefined) filters.minWidth = parseNum(parsed.minWidth);
       if (parsed.maxWidth !== undefined) filters.maxWidth = parseNum(parsed.maxWidth);
       if (parsed.minHeight !== undefined) filters.minHeight = parseNum(parsed.minHeight);
@@ -472,10 +632,35 @@ async function handler(request, response) {
       return response.status(400).json({ success: false, error: 'Invalid search parameter' });
     }
 
+    if (type === 'images' || type === 'videos') {
+      if (maxResults <= 0) {
+        return response.status(400).json({ success: false, error: 'maxResults must be greater than 0' });
+      }
+      if (maxResults > MAX_RESULTS_LIMIT) {
+        return response.status(400).json({ success: false, error: `maxResults cannot exceed ${MAX_RESULTS_LIMIT}` });
+      }
+    } else if (type === 'default') {
+      if (maxSmallSnippets < 0 || maxLargeSnippets < 0) {
+        return response.status(400).json({ success: false, error: 'Snippet limits cannot be negative' });
+      }
+      if (maxSmallSnippets === 0 && maxLargeSnippets === 0) {
+        return response.status(400).json({ success: false, error: 'Both maxSmallSnippets and maxLargeSnippets cannot be 0' });
+      }
+      if (maxSmallSnippets + maxLargeSnippets > MAX_SNIPPETS_SUM_LIMIT) {
+        return response.status(400).json({ success: false, error: `Combined snippets (maxSmallSnippets + maxLargeSnippets) cannot exceed ${MAX_SNIPPETS_SUM_LIMIT}` });
+      }
+      if (maxLargeSnippetSymbols <= 0) {
+        return response.status(400).json({ success: false, error: 'maxLargeSnippetSymbols must be greater than 0' });
+      }
+      if (maxLargeSnippetSymbols > MAX_LARGE_SNIPPET_SYMBOLS_LIMIT) {
+        return response.status(400).json({ success: false, error: `maxLargeSnippetSymbols cannot exceed ${MAX_LARGE_SNIPPET_SYMBOLS_LIMIT}` });
+      }
+    }
+
     const results = [];
     const processedDomains = new Set();
 
-    for (const query of search.slice(0, 5)) {
+    for (const query of search.slice(0, MAX_SEARCH_QUERIES_LIMIT)) {
       const queryDomains = new Set();
       let queryShortCount = 0;
       let queryLongCount = 0;
@@ -517,14 +702,45 @@ async function handler(request, response) {
           }
         }
       } catch (error) {
+        console.error(`Error processing query "${query}":`, error.message, error.stack);
         continue;
       }
     }
 
-    if (results.length === 0) return response.status(404).json({ success: false, error: 'No results found' });
-    return response.status(200).json({ results, success: true });
+    let finalResults = results.slice(0, MAX_RESULTS_LIMIT);
+
+    if (type === 'videos' && includeAdditionalData) {
+      const ytVideoIds = [];
+      const ytResults = [];
+      for (const res of finalResults) {
+        const ytId = extractYoutubeId(res.videoUrl);
+        if (ytId) {
+          ytVideoIds.push(ytId);
+          ytResults.push({ result: res, ytId });
+        }
+      }
+
+      if (ytVideoIds.length > 0) {
+        const ytDataMap = await fetchYoutubeMetadata(ytVideoIds);
+        for (const item of ytResults) {
+          const meta = ytDataMap[item.ytId];
+          if (meta) {
+            item.result.description = meta.description;
+            item.result.additionalData = {
+              type: 'youtube',
+              channelTitle: meta.channelTitle,
+              statistics: meta.statistics
+            };
+          }
+        }
+      }
+    }
+
+    if (finalResults.length === 0) return response.status(404).json({ success: false, error: 'No results found' });
+    return response.status(200).json({ results: finalResults, success: true });
 
   } catch (error) {
+    console.error('Internal handler error:', error.message, error.stack);
     return response.status(500).json({ success: false, error: 'Internal server error' });
   }
 }
