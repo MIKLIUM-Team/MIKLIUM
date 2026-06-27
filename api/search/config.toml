@@ -105,6 +105,13 @@ placeholder = "e.g., 300 or 5:00"
 visible_if_id = "type"
 visible_if_value = "videos"
 
+[[playground.inputs]]
+id = "includeAdditionalData"
+label = "Include Additional Data"
+type = "checkbox"
+default = false
+visible_if_id = "type"
+visible_if_value = "videos"
 
 [test]
 endpoint = "/api/search"
