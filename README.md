@@ -15,7 +15,7 @@
 At MIKLIUM, we empower developers and users with high-quality, free APIs and software tools to help you build, innovate, and explore without limits.
 
 * **[Our Website](https://miklium-team.github.io/MIKLIUM/)**
-* **[Our Discord server](https://discord.gg/d3txS4q8)**
+* **[Our Discord server](https://discord.gg/6HUJTXh45t)**
 * **[Contribution Guidelines](docs/CONTRIBUTING.md)**
 
 ## Currently Available APIs:
