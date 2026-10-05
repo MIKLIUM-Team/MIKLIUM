@@ -110,7 +110,7 @@ The chatbot recognises a wide range of topics out of the box:
 | Python Sandbox | python, sandbox, run code, code execution |
 | Search API | search, web search, find, queries |
 | YouTube Transcript | youtube, transcript, captions, subtitles |
-| Apple Shortcuts | shortcut, icloud, routinehub, automation |
+| Apple Shortcuts | shortcut, icloud, automation |
 | Chatbot API | chatbot, chat api, this api, bot api |
 | Response Stacking | response stacking, stacking, stacked response |
 | GitHub / OSS | github, open source, contribute, pull request |

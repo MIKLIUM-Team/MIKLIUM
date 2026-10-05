@@ -34,82 +34,23 @@ async function handler(req, res) {
   }
 
   url = url.split('#')[0].replace(/\/+$/, '');
-  const originalUrl = url;
 
-  let linkType = '';
-  let links = {
-    iCloudLink: null,
-    routineHubLink: null,
-    routineHubDirectLink: null
-  };
-  let shortcutId;
-
-  if (url.startsWith('https://routinehub.co/shortcut/')) {
-    linkType = 'RoutineHub Link';
-    links.routineHubLink = originalUrl;
-
-    const rhMatch = url.match(/\/shortcut\/(\d+)/);
-    if (!rhMatch) {
-      console.log(`Invalid RoutineHub URL format: ${url}`);
-      return res.status(400).json({ success: false, error: 'Invalid RoutineHub shortcut URL' });
-    }
-    shortcutId = rhMatch[1];
-
-    try {
-      const apiResponse = await fetch(`https://routinehub.co/api/v1/shortcuts/${shortcutId}/versions/latest`, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ShortcutResolver/1.0)' } });
-      if (!apiResponse.ok) {
-        console.log(`RoutineHub API returned ${apiResponse.status} for shortcut ${shortcutId}`);
-        return res.status(404).json({
-          success: false,
-          error: 'RoutineHub shortcut not found'
-        });
-      }
-      const apiData = await apiResponse.json();
-      url = apiData.URL;
-      links.iCloudLink = url;
-      links.routineHubDirectLink = `https://routinehub.co/download/${apiData.id}`;
-    } catch (error) {
-      console.log(`RoutineHub API fetch failed: ${error.message}`);
-      return res.status(502).json({ success: false, error: 'Failed to fetch RoutineHub metadata' });
-    }
+  if (url.includes('routinehub.co')) {
+    console.log(`RoutineHub URL rejected: ${url}`);
+    return res.status(400).json({ success: false, error: 'RoutineHub links are no longer supported. Please use an iCloud shortcut link.' });
   }
-  else if (url.startsWith('https://routinehub.co/download/')) {
-    linkType = 'RoutineHub Direct Download Link';
-    links.routineHubDirectLink = originalUrl;
 
-    try {
-      const redirectResponse = await fetch(url, {
-        method: 'HEAD',
-        redirect: 'follow',
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ShortcutResolver/1.0)' }
-      });
+  const linkType = 'iCloud Link';
 
-      const finalUrl = redirectResponse.url;
-
-      if (!finalUrl || !finalUrl.includes('icloud.com/shortcuts')) {
-        console.log(`RoutineHub redirect did not resolve to iCloud: ${finalUrl}`);
-        return res.status(400).json({
-          success: false,
-          error: 'Final redirected URL is not a valid iCloud shortcut'
-        });
-      }
-      url = finalUrl;
-      links.iCloudLink = url;
-
-    } catch (error) {
-      console.log(`RoutineHub redirect failed: ${error.message}`);
-      return res.status(502).json({ success: false, error: 'Failed to resolve RoutineHub redirect' });
-    }
-  }
-  else if (url.includes('icloud.com/shortcuts')) {
-    linkType = 'iCloud Link';
-    links.iCloudLink = originalUrl;
+  if (!url.includes('icloud.com/shortcuts')) {
+    console.log(`Could not extract shortcut ID from URL: ${url}`);
+    return res.status(400).json({ success: false, error: 'Invalid shortcut URL. Only iCloud shortcut links are supported.' });
   }
 
   const match = url.match(/\/shortcuts\/([a-f0-9]{32})/i);
   if (!match) {
     console.log(`Could not extract shortcut ID from URL: ${url}`);
-    return res.status(400).json({ success: false, error: 'Invalid shortcut URL' });
+    return res.status(400).json({ success: false, error: 'Invalid shortcut URL. Only iCloud shortcut links are supported.' });
   }
 
   const id = match[1].toLowerCase();
@@ -204,7 +145,6 @@ async function handler(req, res) {
     const result = {
       success: true,
       inputType: linkType,
-      shortcutLinks: links,
       shortcutData: {
         name,
         dateOfSharing: formatDates(timestamp),

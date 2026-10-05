@@ -22,7 +22,7 @@ expected_key = "success"
 expected_value = true
 
 [test.cases.payload]
-url = "https://routinehub.co/shortcut/18431/"
+url = "https://www.icloud.com/shortcuts/dbd68fde729740b2a7218a177808655f"
 
 [[test.cases]]
 name = "Invalid URL"

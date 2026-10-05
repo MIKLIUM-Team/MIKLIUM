@@ -16,7 +16,10 @@
 
 ## About MIKLIUM Apple Shortcuts Data API
 
-**Get detailed information about Apple Shortcut from its link quickly and conveniently.** Using this API, you can get data such as the name of the shortcut, the date of creation of the link to it, the links to download the signed `.shortcut` file, `.plist` file, the shortcut icon and much more. Our “shortcut data scraper” uses the iCloud API system and RoutineHub API for [RoutineHub](https://routinehub.co/) (place where you can search for beautiful and incredible shortcuts and share yours projects) integration.
+**Get detailed information about Apple Shortcut from its iCloud link quickly and conveniently.** Using this API, you can get data such as the name of the shortcut, the date of creation of the link to it, the links to download the signed `.shortcut` file, `.plist` file, the shortcut icon and much more. Our “shortcut data scraper” uses the iCloud Shortcuts Records API.
+
+> [!NOTE]
+> Only iCloud shortcut links (`icloud.com/shortcuts/...`) are supported.
 
 ## Request Body
 
@@ -24,7 +27,7 @@ Link: `https://miklium.vercel.app/api/shortcut-info`
 
 | Parameter | Required | Type | Description |
 | :--- | :--- | :--- | :--- |
-| `url` | Yes | Text | Shortcut link (iCloud links, RoutineHub links and direct download RoutineHub links are supported) |
+| `url` | Yes | Text | iCloud shortcut link (only `icloud.com/shortcuts/...` links are supported) |
 
 ### GET Method
 
@@ -35,8 +38,6 @@ Link: `https://miklium.vercel.app/api/shortcut-info`
 
 **Request Link Examples:**
 * `https://miklium.vercel.app/api/shortcut-info?url=https://www.icloud.com/shortcuts/dbd68fde729740b2a7218a177808655f`
-* `https://miklium.vercel.app/api/shortcut-info?url=https://routinehub.co/download/56215/`
-* `https://miklium.vercel.app/api/shortcut-info?url=https://routinehub.co/shortcut/18431/`
 
 ### POST Method
 
@@ -49,11 +50,6 @@ Link: `https://miklium.vercel.app/api/shortcut-info`
 ```
 
 **Request Body Examples (JSON):**
-```javascript
-{
-  "url": "https://routinehub.co/shortcut/18431/"
-}
-```
 ```javascript
 {
   "url": "https://www.icloud.com/shortcuts/dbd68fde729740b2a7218a177808655f"
@@ -114,12 +110,7 @@ curl -X POST https://miklium.vercel.app/api/shortcut-info \
 ```javascript
 {
   "success": true,
-  "inputType": "…", // The type of the URL that was entered as an input
-  "shortcutLinks": {
-    "iCloudLink": "…", // iCloud link to download shortcut, if it was found, or null
-    "routineHubLink": "…", // RoutineHub link to shortcut, if it was found, or null
-    "routineHubDirectLink": "…" // RoutineHub direct download link to shortcut, if it was found, or null
-  },
+  "inputType": "iCloud Link", // The type of the URL that was entered as an input
   "shortcutData": {
     "name": "…", // Shotcut name
     "dateOfSharing": {
@@ -164,12 +155,7 @@ curl -X POST https://miklium.vercel.app/api/shortcut-info \
 ```javascript
 {
   "success": true,
-  "inputType": "RoutineHub Link",
-  "shortcutLinks": {
-    "iCloudLink": "https://www.icloud.com/shortcuts/dbd68fde729740b2a7218a177808655f",
-    "routineHubLink": "https://routinehub.co/shortcut/18431",
-    "routineHubDirectLink": "https://routinehub.co/download/56215"
-  },
+  "inputType": "iCloud Link",
   "shortcutData": {
     "name": "Nuvole AI",
     "dateOfSharing": {
@@ -224,11 +210,10 @@ curl -X POST https://miklium.vercel.app/api/shortcut-info \
 ```javascript
 {
   "success": false,
-  "error": "Invalid shortcut URL"
+  "error": "Invalid shortcut URL. Only iCloud shortcut links are supported."
 }
 ```
 
 ## What Services Does This API Use?
 
 - iCloud Shortcuts Records API
-- [RoutineHub API](https://github.com/mvan231/RoutineHubDocs/blob/main/README.md)

@@ -68,10 +68,10 @@ RESPONSES = [
 
     # ── Apple Shortcuts ──────────────────────────────────────────────────────
     (r"\b(shortcut|shortcuts|apple.?shortcut|icloud|routinehub|plist|automation)\b", [
-        "The Apple Shortcuts Data API fetches metadata from iCloud shortcut links and RoutineHub links — name, creation date, icon, download URLs, and file sizes.",
-        "Shortcuts API accepts iCloud links (icloud.com/shortcuts/...), RoutineHub shortcut pages, and RoutineHub direct download links.",
+        "The Apple Shortcuts Data API fetches metadata from iCloud shortcut links — name, creation date, icon, download URLs, and file sizes.",
+        "Shortcuts API accepts only iCloud links (icloud.com/shortcuts/...).",
         "Shortcut icon download URLs and file download links are temporary and expire after ~7 hours, so cache them if you need them long-term.",
-        "The Apple Shortcuts API uses the iCloud Shortcuts Records API and the RoutineHub API under the hood.",
+        "The Apple Shortcuts API uses the iCloud Shortcuts Records API under the hood.",
     ]),
 
     # ── Chatbot API ──────────────────────────────────────────────────────────
