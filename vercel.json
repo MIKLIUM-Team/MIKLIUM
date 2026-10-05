@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/**/*": {
+      "excludeFiles": "{.github/**,beta/**,docs/**,webpage/**,api/python-sandbox/backend/**,**/*.md}"
+    }
+  },
   "routes": [
     {
       "src": "^/(?!api(?:/|$))(.*)",
